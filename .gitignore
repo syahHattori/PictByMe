@@ -1,0 +1,41 @@
+# Flutter / Dart
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# IntelliJ / VSCode
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+
+# Android
+**/local.properties
+android/.gradle/
+android/.idea/
+
+# iOS
+ios/Pods/
+Runner/GeneratedPluginRegistrant.*
+
+# Node
+node_modules/
+
+# Laravel / PHP
+pictbyme-api/vendor/
+pictbyme-api/.env
+pictbyme-api/storage/
+pictbyme-api/node_modules/
+
+# Logs
+*.log
+
+# Misc
+*.lock
+*.sqlite
+*.sqlite3

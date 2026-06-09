@@ -178,7 +178,7 @@ Container(
           children: [
 
             const Text(
-              'Discover Beautiful Photography',
+              'Discover Beautiful Photography oke ',
               style: TextStyle(
                 fontSize: 52,
                 fontWeight:

@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 class ApiService {
  static const String baseUrl =
-    'http://localhost:8001/api';
+    'https://api.pictbyme.web.id/api';
 
   final Dio dio = Dio(
     BaseOptions(
