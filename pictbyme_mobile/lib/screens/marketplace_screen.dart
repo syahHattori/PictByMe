@@ -19,21 +19,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   bool isLoading = true;
   int hoveredIndex = -1;
   bool isCoinHovered = false;
-  int coinBalance = 0;
 
   @override
   void initState() {
     super.initState();
     _loadPaidPins();
-    _loadBalance();
-  }
-
-  Future<void> _loadBalance() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final b = prefs.getInt('coin_balance') ?? 0;
-      if (mounted) setState(() => coinBalance = b);
-    } catch (_) {}
   }
 
   Future<void> _loadPaidPins() async {
@@ -48,7 +38,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       setState(() => isLoading = false);
     }
 
-    // If the backend returned no paid pins (or for local dev), provide some example paid pins
+    // Fallback data tiruan jika backend kosong / lokal dev
     if (mounted && paidPins.isEmpty) {
       setState(() {
         paidPins = [
@@ -81,40 +71,60 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 800;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Marketplace'),
-        backgroundColor: cs.surface,
+        title: const Text('Marketplace', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         actions: [
           const SizedBox(width: 8),
+          // Menggunakan ValueListenableBuilder agar sinkron secara realtime di seluruh aplikasi
           MouseRegion(
             cursor: SystemMouseCursors.click,
             onEnter: (_) => setState(() => isCoinHovered = true),
             onExit: (_) => setState(() => isCoinHovered = false),
             child: GestureDetector(
-              onTap: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
-                _loadBalance();
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 curve: Curves.easeOut,
                 transform: Matrix4.identity()..scale(isCoinHovered ? 1.03 : 1.0),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                 decoration: BoxDecoration(
                   color: isCoinHovered ? cs.primary.withOpacity(0.9) : cs.primary,
                   borderRadius: BorderRadius.circular(24),
+                  boxShadow: isCoinHovered ? [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))] : null,
                 ),
-                child: Text('🪙 $coinBalance', style: const TextStyle(color: Colors.white)),
+                child: ValueListenableBuilder<int>(
+                  valueListenable: CoinController().balance,
+                  builder: (context, value, _) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('🪙 ', style: TextStyle(fontSize: 14)),
+                        Text(
+                          '$value',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
         ],
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: cs.primary))
           : LayoutBuilder(builder: (context, constraints) {
               final width = constraints.maxWidth;
               final crossAxisCount = (width / 300).floor().clamp(2, 6);
@@ -128,7 +138,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 itemBuilder: (context, index) {
                   final pin = paidPins[index];
                   final price = pin['price_coin'] ?? 0;
-
+                  final String title = pin['title'] ?? 'Premium Photo';
                   final isHovered = hoveredIndex == index;
 
                   return MouseRegion(
@@ -141,72 +151,138 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                         duration: const Duration(milliseconds: 220),
                         curve: Curves.easeOutCubic,
                         decoration: BoxDecoration(
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
-                            if (isHovered) BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, 6)),
+                            BoxShadow(
+                              color: isHovered ? Colors.black26 : Colors.black.withOpacity(0.04),
+                              blurRadius: isHovered ? 12 : 6,
+                              offset: isHovered ? const Offset(0, 6) : const Offset(0, 2),
+                            ),
                           ],
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(20),
-                          child: Stack(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Image.network(
-                                pin['file_url'],
-                                fit: BoxFit.cover,
-                                loadingBuilder: (context, child, progress) {
-                                  if (progress == null) return child;
-                                  return Container(
-                                    color: Theme.of(context).colorScheme.surface,
-                                    child: const Center(
-                                      child: SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              Positioned(
-                                left: 8,
-                                top: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                  decoration: BoxDecoration(color: cs.surface.withOpacity(0.85), borderRadius: BorderRadius.circular(8)),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.monetization_on, size: 16),
-                                      const SizedBox(width: 6),
-                                      Text('$price'),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              Positioned.fill(
-                                child: AnimatedOpacity(
-                                  duration: const Duration(milliseconds: 180),
-                                  opacity: isHovered ? 1.0 : 0.0,
-                                  curve: Curves.easeInOut,
-                                  child: Container(
-                                    decoration: BoxDecoration(color: Colors.black45),
-                                    child: Center(
-                                      child: Center(
-                                        child: ElevatedButton.icon(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: cs.primary,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              Stack(
+                                children: [
+                                  Image.network(
+                                    pin['file_url'],
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, progress) {
+                                      if (progress == null) return child;
+                                      return Container(
+                                        height: 200,
+                                        color: Colors.grey[100],
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
                                           ),
-                                          onPressed: () => _buyPin(pin),
-                                          icon: const Icon(Icons.shopping_cart),
-                                          label: const Text('Buy'),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (_, __, ___) => Container(
+                                      height: 150,
+                                      color: Colors.grey[100],
+                                      child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                                    ),
+                                  ),
+
+                                  // Label Harga di Pojok Atas (Hanya tampil di Desktop, di Mobile pindah ke bawah)
+                                  if (!isMobile)
+                                    Positioned(
+                                      left: 10,
+                                      top: 10,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.9),
+                                          borderRadius: BorderRadius.circular(10),
+                                         
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Text('🪙 ', style: TextStyle(fontSize: 12)),
+                                            Text(
+                                              '$price',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
+
+                                  // Overlay Efek Hover (Hanya diaktifkan untuk Desktop Browser)
+                                  if (!isMobile)
+                                    Positioned.fill(
+                                      child: AnimatedOpacity(
+                                        duration: const Duration(milliseconds: 180),
+                                        opacity: isHovered ? 1.0 : 0.0,
+                                        curve: Curves.easeInOut,
+                                        child: Container(
+                                          color: Colors.black45,
+                                          child: Center(
+                                            child: ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: cs.primary,
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                              ),
+                                              onPressed: () => _buyPin(pin),
+                                              icon: const Icon(Icons.shopping_cart_outlined, size: 18),
+                                              label: const Text('Buy Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              
+                              // AREA FOOTER RESPONSIVE (Sangat krusial untuk kenyamanan pengguna HP/Tablet)
+                              if (isMobile)
+                                Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                const Text('🪙 ', style: TextStyle(fontSize: 12)),
+                                                Text(
+                                                  '$price',
+                                                  style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // Tombol Beli Langsung yang mudah diketuk jari di HP
+                                      IconButton.filled(
+                                        style: IconButton.styleFrom(backgroundColor: cs.primary),
+                                        onPressed: () => _buyPin(pin),
+                                        icon: const Icon(Icons.shopping_cart, size: 18, color: Colors.white),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                         ),
@@ -228,17 +304,28 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         final prefs = await SharedPreferences.getInstance();
         final balance = data['data']?['balance'] ?? prefs.getInt('coin_balance') ?? 0;
         await prefs.setInt('coin_balance', balance);
-        // update global coin controller so UI stays in sync
+        
+        // Memperbarui balance global agar UI di screen lain (seperti HomeScreen) langsung ikut berubah
         await CoinController().setBalance(balance);
+        
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? 'Purchase successful')));
-          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['message'] ?? 'Purchase successful ✨'), backgroundColor: Colors.green),
+          );
         }
       } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? 'Purchase failed')));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['message'] ?? 'Purchase failed'), backgroundColor: Colors.redAccent),
+          );
+        }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Purchase error')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Purchase error. Silakan cek saldo koin Anda.'), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
 }

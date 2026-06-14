@@ -9,271 +9,256 @@ class LoginDialog extends StatefulWidget {
   const LoginDialog({super.key});
 
   @override
-  State<LoginDialog> createState() =>
-      _LoginDialogState();
+  State<LoginDialog> createState() => _LoginDialogState();
 }
 
-class _LoginDialogState
-    extends State<LoginDialog> {
-  // use theme colors
-final TextEditingController emailController =
-    TextEditingController();
+class _LoginDialogState extends State<LoginDialog> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final ApiService apiService = ApiService();
+  final _formKey = GlobalKey<FormState>();
+  
+  bool isLoading = false;
 
-final TextEditingController passwordController =
-    TextEditingController();
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 
-final ApiService apiService = ApiService();
-Future<void> login() async {
-  try {
-    final response = await apiService.login(
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
+  void _showSnackBar(String message, [Color bgColor = Colors.redAccent]) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
+        backgroundColor: bgColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
+  }
 
-    if (response.data['success'] == true) {
-      final prefs =
-          await SharedPreferences.getInstance();
+  Future<void> login() async {
+    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
+      return;
+    }
 
-      await prefs.setString(
-        'token',
-        response.data['token'],
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await apiService.login(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Login berhasil',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (response.data['success'] == true) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', response.data['token']);
 
-      Navigator.pop(context);
+        if (!mounted) return;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-        ),
-      );
+        _showSnackBar('Login berhasil ✨', Colors.green);
+
+        // Tutup dialog login secara aman
+        Navigator.pop(context);
+
+        // Alihkan halaman utama
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else {
+        final msg = response.data['message'] ?? 'Login gagal. Periksa kembali akun Anda.';
+        _showSnackBar(msg.toString());
+      }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      String message = 'Terjadi kesalahan. Silakan coba lagi.';
+
+      if (e.response?.statusCode == 401) {
+        message = 'Email atau password salah.';
+      } else if (e.response?.statusCode == 422) {
+        message = 'Data login tidak valid.';
+      } else if (e.response?.statusCode == 404) {
+        message = 'Akun belum terdaftar.';
+      }
+
+      _showSnackBar(message);
+      debugPrint('LOGIN ERROR: ${e.response?.data}');
+    } catch (e) {
+      _showSnackBar('Tidak dapat terhubung ke server.');
+      debugPrint('ERROR: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
-  } on DioException catch (e) {
-    String message =
-        'Terjadi kesalahan. Silakan coba lagi.';
-
-    if (e.response?.statusCode == 401) {
-      message =
-          'Email atau password salah.';
-    }
-
-    if (e.response?.statusCode == 422) {
-      message =
-          'Data login tidak valid.';
-    }
-
-    if (e.response?.statusCode == 404) {
-      message =
-          'Akun belum terdaftar.';
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
-
-    debugPrint(
-      'LOGIN ERROR: ${e.response?.data}',
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Tidak dapat terhubung ke server.',
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-
-    debugPrint(
-      'ERROR: $e',
-    );
   }
-}
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.circular(25),
-      ),
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       child: Container(
-        width: 900,
-        height: 550,
-        padding: const EdgeInsets.all(30),
-
+        width: 850,
+        height: 520,
+        padding: const EdgeInsets.all(24),
         child: Row(
           children: [
-
-            // LEFT SIDE
+            // --- SISI KIRI: FORM ENTRI LOGIN ---
             Expanded(
-              child: Column(
-                mainAxisAlignment:
-                    MainAxisAlignment.center,
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-
-                  Center(
-                    child: Icon(
-                      Icons.camera_alt_rounded,
-                      size: 60,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Center(
-                    child: Text(
-                      'Welcome Back',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight:
-                            FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  const Center(
-                    child: Text(
-                      'Login to continue using PictByMe',
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                
-                 TextField(
-  controller: emailController,
-  decoration: InputDecoration(
-    labelText: 'Email',
-    prefixIcon: const Icon(
-      Icons.email,
-    ),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(
-        15,
-      ),
-    ),
-  ),
-),
-
-                  const SizedBox(height: 15),
-
-                 TextField(
-  controller: passwordController,
-  obscureText: true,
-                    decoration:
-                        InputDecoration(
-                      labelText:
-                          'Password',
-                      prefixIcon:
-                          const Icon(
-                        Icons.lock,
-                      ),
-                      border:
-                          OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(
-                          15,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.03), shape: BoxShape.circle),
+                          child: const Icon(Icons.camera_alt_rounded, size: 44, color: Colors.black87),
                         ),
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      const SizedBox(height: 16),
+                      const Center(
+                        child: Text(
+                          'Selamat Datang',
+                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.black87),
+                        ),
                       ),
-                      onPressed: login,
-                      child: const Text(
-                        'Login',
+                      const SizedBox(height: 4),
+                      Center(
+                        child: Text(
+                          'Masuk untuk melanjutkan penjelajahan di PictByMe',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[500], fontWeight: FontWeight.w500),
+                        ),
                       ),
-                    ),
-                  ),
+                      const SizedBox(height: 28),
 
-                  const SizedBox(height: 15),
-
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        showDialog(
-                          context: context,
-                          builder: (_) => const RegisterDialog(),
-                        );
-                      },
-                      child: const Text(
-                        "Don't have an account? Register",
+                      // FIELD EMAIL
+                      TextFormField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Email wajib diisi';
+                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v.trim())) {
+                            return 'Format email tidak valid';
+                          }
+                          return null;
+                        },
                       ),
-                    ),
+                      const SizedBox(height: 14),
+
+                      // FIELD PASSWORD
+                      TextFormField(
+                        controller: passwordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        validator: (v) => (v == null || v.isEmpty) ? 'Password wajib diisi' : null,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // BUTTON LOGIN PROSES
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black87,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
+                          ),
+                          onPressed: isLoading ? null : login,
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                )
+                              : const Text('Masuk', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Center(
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            showDialog(
+                              context: context,
+                              builder: (_) => const RegisterDialog(),
+                            );
+                          },
+                          child: Text(
+                            "Belum punya akun? Daftar sekarang",
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
 
-            const SizedBox(width: 30),
+            const SizedBox(width: 20),
 
-            // RIGHT SIDE
+            // --- SISI KANAN: BANNER DEKORATIF ---
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E1E24), Color(0xFF2A2A35)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(20),
                 ),
-
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.photo_library,
-                        size: 120,
-                        color: Theme.of(context).colorScheme.onPrimary,
+                        Icons.photo_library_rounded,
+                        size: 100,
+                        color: Colors.white.withOpacity(0.9),
                       ),
-
-                      const SizedBox(height: 20),
-
-                      Text(
+                      const SizedBox(height: 16),
+                      const Text(
                         'PictByMe',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                       ),
-
-                      const SizedBox(height: 10),
-
+                      const SizedBox(height: 6),
                       Text(
-                        'Share Your Story\nThrough Photos',
+                        'Bagikan Ceritamu\nMelalui Lembaran Foto',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary.withAlpha((0.9 * 255).round()),
-                          fontSize: 18,
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 15,
+                          height: 1.4,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],

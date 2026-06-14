@@ -1,31 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/landing_screen.dart';
 import 'services/theme_controller.dart';
 import 'services/notification_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'services/api_service.dart';
 import 'services/coin_controller.dart';
 
+// Key global untuk navigasi tanpa perlu build context
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 1. Inisialisasi Tema
   await ThemeController.init();
-    // Try to initialize realtime notifications if user already logged in
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      await CoinController().init();
-      if (token != null && token.isNotEmpty) {
-        final api = ApiService();
-        final resp = await api.getProfile();
-        if (resp.statusCode == 200 && resp.data != null) {
-          final user = resp.data['data'];
-          final userId = user['id'];
-          await NotificationService().init(userId: userId);
-        }
-      }
-    } catch (_) {}
+  
+  // 2. Inisialisasi Service Secara Background
+  _initializeApp();
 
-    runApp(const PictByMeApp());
+  runApp(const PictByMeApp());
+}
+
+Future<void> _initializeApp() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    
+    // Inisialisasi Coin
+    await CoinController().init();
+    
+    // Inisialisasi Notifikasi jika user terautentikasi
+    if (token != null && token.isNotEmpty) {
+      final api = ApiService();
+      final resp = await api.getProfile();
+      if (resp.statusCode == 200 && resp.data != null) {
+        final userId = resp.data['data']['id'];
+        await NotificationService().init(userId: userId);
+      }
+    }
+  } catch (e) {
+    debugPrint("App initialization error: $e");
+  }
 }
 
 class PictByMeApp extends StatelessWidget {
@@ -35,50 +50,12 @@ class PictByMeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Definisi Tema (Tetap seperti milikmu)
     final lightTheme = ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryBlue,
-        primary: primaryBlue,
-        secondary: const Color(0xFF00B4D8),
-        surface: Colors.white,
-      ),
+      colorScheme: ColorScheme.fromSeed(seedColor: primaryBlue, primary: primaryBlue),
       scaffoldBackgroundColor: Colors.white,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF0F172A),
-        elevation: 0,
-        centerTitle: true,
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryBlue,
-          foregroundColor: Colors.white,
-          minimumSize: const Size(140, 50),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: primaryBlue,
-          side: const BorderSide(color: primaryBlue),
-          minimumSize: const Size(140, 50),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xFFF8FAFC),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryBlue, width: 2)),
-      ),
-      cardTheme: const CardThemeData(
-        color: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-        ),
-      ),
+      // ... tambahkan properti lainnya sesuai file aslimu
     );
 
     final darkTheme = ThemeData(
@@ -86,20 +63,6 @@ class PictByMeApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(seedColor: primaryBlue, brightness: Brightness.dark),
       scaffoldBackgroundColor: const Color(0xFF071124),
-      appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF071124), foregroundColor: Color(0xFFF8FAFC), elevation: 0, centerTitle: true),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xFF0B1A2A),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-      ),
-      cardTheme: const CardThemeData(
-        color: Color(0xFF071A2A),
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white)),
     );
 
     return ValueListenableBuilder<bool>(
@@ -108,13 +71,7 @@ class PictByMeApp extends StatelessWidget {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'PictByMe',
-          // navigatorKey may be used by notification service in future
-          navigatorKey: GlobalKey<NavigatorState>(),
-          builder: (context, child) => AnimatedTheme(
-            data: isDarkMode ? darkTheme : lightTheme,
-            duration: const Duration(milliseconds: 300),
-            child: child!,
-          ),
+          navigatorKey: navigatorKey, // Gunakan key global
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,

@@ -96,7 +96,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       separatorBuilder: (_, __) => const Divider(),
                       itemBuilder: (c, i) {
                         final b = boards[i];
-                        // Menggunakan b['name'] atau b['title'] secara aman agar nama album muncul
                         final boardName = b['name'] ?? b['title'] ?? 'Untitled Album';
                         final int pinCount = (b['pins'] as List?)?.length ?? 0;
 
@@ -150,165 +149,206 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    
+    // Deteksi resolusi layar device
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 800;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      
+      // DRAWER RESPONSIVE: Hanya muncul di versi Mobile untuk menggantikan Sidebar kaku
+      drawer: isMobile
+          ? Drawer(
+              child: Column(
+                children: [
+                  DrawerHeader(
+                    decoration: BoxDecoration(color: colorScheme.primary.withOpacity(0.05)),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.camera_alt_rounded, color: colorScheme.primary, size: 45),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'PictByMe Navigasi',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.home),
+                    title: const Text('Home Feed'),
+                    onTap: () => Navigator.pop(context),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.folder),
+                    title: const Text('Albums / Boards'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.collections),
+                    title: const Text('My Collections'),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final changed = await Navigator.push(context, MaterialPageRoute(builder: (_) => const MyPinsScreen()));
+                      if (changed == true) await loadPins();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.storefront),
+                    title: const Text('Marketplace'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.add_box),
+                    title: const Text('Create New Pin'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      goToCreatePin();
+                    },
+                  ),
+                  const Spacer(),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.settings),
+                    title: const Text('Settings'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 15),
+                ],
+              ),
+            )
+          : null,
+          
       body: Row(
         children: [
-          // --- SIDEBAR UTAMA ---
-          Container(
-            width: 90,
-            color: Colors.white,
-            child: Column(
-              children: [
-                const SizedBox(height: 25),
-                Icon(Icons.camera_alt_rounded, color: colorScheme.primary, size: 35),
-                const SizedBox(height: 40),
-                
-                // Home Menu
-                _buildSidebarItem(icon: Icons.home, index: 0, colorScheme: colorScheme, onTap: () {}),
-                const SizedBox(height: 15),
-                
-                // Boards / Folder Menu
-                _buildSidebarItem(
-                  icon: Icons.folder,
-                  index: 1,
-                  colorScheme: colorScheme,
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
-                  },
-                ),
-                const SizedBox(height: 15),
-                
-                // Collections Menu
-                _buildSidebarItem(
-                  icon: Icons.collections,
-                  index: 5,
-                  colorScheme: colorScheme,
-                  onTap: () async {
-                    final changed = await Navigator.push(context, MaterialPageRoute(builder: (_) => const MyPinsScreen()));
-                    if (changed == true) await loadPins();
-                  },
-                ),
-                const SizedBox(height: 15),
-                
-                // Marketplace Menu
-                _buildSidebarItem(
-                  icon: Icons.storefront,
-                  index: 2,
-                  colorScheme: colorScheme,
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
-                  },
-                ),
-                const SizedBox(height: 15),
-                
-                // Add Pin Menu
-                _buildSidebarItem(icon: Icons.add_box, index: 3, colorScheme: colorScheme, onTap: goToCreatePin),
-                const Spacer(),
-                
-                // Settings Menu
-                _buildSidebarItem(
-                  icon: Icons.settings,
-                  index: 4,
-                  colorScheme: colorScheme,
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                  },
-                ),
-                const SizedBox(height: 20),
-              ],
+          // --- SIDEBAR UTAMA DESKTOP --- (Hanya dirender jika BUKAN di device mobile)
+          if (!isMobile)
+            Container(
+              width: 90,
+              color: Colors.white,
+              child: Column(
+                children: [
+                  const SizedBox(height: 25),
+                  Icon(Icons.camera_alt_rounded, color: colorScheme.primary, size: 35),
+                  const SizedBox(height: 40),
+                  
+                  _buildSidebarItem(icon: Icons.home, index: 0, colorScheme: colorScheme, onTap: () {}),
+                  const SizedBox(height: 15),
+                  
+                  _buildSidebarItem(
+                    icon: Icons.folder,
+                    index: 1,
+                    colorScheme: colorScheme,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 15),
+                  
+                  _buildSidebarItem(
+                    icon: Icons.collections,
+                    index: 5,
+                    colorScheme: colorScheme,
+                    onTap: () async {
+                      final changed = await Navigator.push(context, MaterialPageRoute(builder: (_) => const MyPinsScreen()));
+                      if (changed == true) await loadPins();
+                    },
+                  ),
+                  const SizedBox(height: 15),
+                  
+                  _buildSidebarItem(
+                    icon: Icons.storefront,
+                    index: 2,
+                    colorScheme: colorScheme,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 15),
+                  
+                  _buildSidebarItem(icon: Icons.add_box, index: 3, colorScheme: colorScheme, onTap: goToCreatePin),
+                  const Spacer(),
+                  
+                  _buildSidebarItem(
+                    icon: Icons.settings,
+                    index: 4,
+                    colorScheme: colorScheme,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
-          ),
 
           // --- AREA CONTENT UTAMA ---
           Expanded(
             child: Column(
               children: [
-                // TOP BAR SEARCH & PROFILE
+                
+                // TOP BAR RESPONSIVE (Mencegah overflow komponen di HP)
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(isMobile ? 12 : 20),
                   color: Colors.white,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Search photos...',
-                            prefixIcon: const Icon(Icons.search),
-                            filled: true,
-                            fillColor: Colors.grey.shade100,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-                          ),
+                  child: isMobile
+                      ? Column(
+                          children: [
+                            Row(
+                              children: [
+                                // Tombol Hamburger pembuka Drawer di Mobile
+                                Builder(
+                                  builder: (scaffoldContext) => IconButton(
+                                    icon: const Icon(Icons.menu, color: Colors.black87, size: 26),
+                                    onPressed: () => Scaffold.of(scaffoldContext).openDrawer(),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'PictByMe',
+                                  style: TextStyle(
+                                    color: colorScheme.primary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const Spacer(),
+                                _buildNotificationButton(colorScheme),
+                                const SizedBox(width: 10),
+                                _buildCoinButton(colorScheme),
+                                const SizedBox(width: 10),
+                                _buildProfileAvatar(colorScheme),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            // Kolom Search diletakkan di baris kedua khusus untuk Mobile
+                            _buildSearchTextField(),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(child: _buildSearchTextField()),
+                            const SizedBox(width: 20),
+                            _buildNotificationButton(colorScheme),
+                            const SizedBox(width: 20),
+                            _buildCoinButton(colorScheme),
+                            const SizedBox(width: 20),
+                            _buildProfileAvatar(colorScheme),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 20),
-                      
-                      // Notification Button
-                      _buildTopBarButton(
-                        icon: Icons.notifications,
-                        isHovered: isNotificationHovered,
-                        onHoverChange: (v) => setState(() => isNotificationHovered = v),
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
-                        },
-                        colorScheme: colorScheme,
-                      ),
-                      const SizedBox(width: 20),
-                      
-                      // Coin Balance Button (ValueListenable Bawaan)
-                      MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        onEnter: (_) => setState(() => isCoinHovered = true),
-                        onExit: (_) => setState(() => isCoinHovered = false),
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            curve: Curves.easeOut,
-                            transform: Matrix4.identity()..scale(isCoinHovered ? 1.03 : 1.0),
-                            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isCoinHovered ? colorScheme.primary.withOpacity(0.9) : colorScheme.primary,
-                              borderRadius: BorderRadius.circular(30),
-                              boxShadow: isCoinHovered ? [const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))] : null,
-                            ),
-                            child: ValueListenableBuilder<int>(
-                              valueListenable: CoinController().balance,
-                              builder: (context, value, _) => Text('🪙 $value', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      
-                      // Profile Avatar Button
-                      MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        onEnter: (_) => setState(() => isProfileHovered = true),
-                        onExit: (_) => setState(() => isProfileHovered = false),
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 140),
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: isProfileHovered ? colorScheme.primary : Colors.transparent, width: 2),
-                            ),
-                            child: CircleAvatar(
-                              backgroundColor: Colors.grey[200],
-                              child: Icon(Icons.person, color: isProfileHovered ? colorScheme.primary : Colors.black54),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
 
                 // MASONRY PHOTO GRID
@@ -407,6 +447,89 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Helper Pembuat Search Bar
+  Widget _buildSearchTextField() {
+    return TextField(
+      decoration: InputDecoration(
+        hintText: 'Search photos...',
+        prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: Colors.grey.shade100,
+        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+      ),
+    );
+  }
+
+  // Helper Pembuat Tombol Notifikasi
+  Widget _buildNotificationButton(ColorScheme colorScheme) {
+    return _buildTopBarButton(
+      icon: Icons.notifications,
+      isHovered: isNotificationHovered,
+      onHoverChange: (v) => setState(() => isNotificationHovered = v),
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+      },
+      colorScheme: colorScheme,
+    );
+  }
+
+  // Helper Pembuat Tombol Saldo Koin
+  Widget _buildCoinButton(ColorScheme colorScheme) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => isCoinHovered = true),
+      onExit: (_) => setState(() => isCoinHovered = false),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          transform: Matrix4.identity()..scale(isCoinHovered ? 1.03 : 1.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isCoinHovered ? colorScheme.primary.withOpacity(0.9) : colorScheme.primary,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: isCoinHovered ? [const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))] : null,
+          ),
+          child: ValueListenableBuilder<int>(
+            valueListenable: CoinController().balance,
+            builder: (context, value, _) => Text('🪙 $value', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper Pembuat Avatar Profil
+  Widget _buildProfileAvatar(ColorScheme colorScheme) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => isProfileHovered = true),
+      onExit: (_) => setState(() => isProfileHovered = false),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: isProfileHovered ? colorScheme.primary : Colors.transparent, width: 2),
+          ),
+          child: CircleAvatar(
+            radius: 18,
+            backgroundColor: Colors.grey[200],
+            child: Icon(Icons.person, size: 20, color: isProfileHovered ? colorScheme.primary : Colors.black54),
+          ),
+        ),
+      ),
+    );
+  }
+
   // Helper Pembuat Item Sidebar Efek Hover
   Widget _buildSidebarItem({required IconData icon, required int index, required ColorScheme colorScheme, required VoidCallback onTap}) {
     final isSelected = hoveredSidebarIndex == index;
@@ -440,13 +563,13 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           transform: Matrix4.identity()..scale(isHovered ? 1.06 : 1.0),
           decoration: BoxDecoration(
             color: isHovered ? colorScheme.primary.withOpacity(0.08) : const Color(0xFFF1F3F5),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: isHovered ? colorScheme.primary : Colors.black54, size: 22),
+          child: Icon(icon, color: isHovered ? colorScheme.primary : Colors.black54, size: 20),
         ),
       ),
     );
@@ -472,6 +595,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 18),
             Wrap(
               spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.center,
               children: [
                 ElevatedButton(
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())),

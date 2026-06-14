@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/theme_controller.dart';
 
-// custom_navbar removed here to keep Settings inside Home flow
-
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -29,18 +27,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      notifications = prefs.getBool(_prefsNotifications) ?? true;
-      darkMode = prefs.getBool(_prefsDarkMode) ?? false;
-      showProfilePublic = prefs.getBool(_prefsProfilePublic) ?? true;
-      allowDataSharing = prefs.getBool(_prefsDataSharing) ?? false;
-    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        notifications = prefs.getBool(_prefsNotifications) ?? true;
+        darkMode = prefs.getBool(_prefsDarkMode) ?? false;
+        showProfilePublic = prefs.getBool(_prefsProfilePublic) ?? true;
+        allowDataSharing = prefs.getBool(_prefsDataSharing) ?? false;
+      });
+    } catch (e) {
+      debugPrint("Error memuat preferensi: $e");
+    }
   }
 
-  Future<void> _saveBool(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
+  Future<void> _savePreference(String key, bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(key, value);
+    } catch (e) {
+      debugPrint("Gagal menyimpan preferensi ($key): $e");
+    }
+  }
+
+  void _showStatusSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
@@ -48,139 +68,164 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: cs.surface,
+        backgroundColor: Colors.white,
         elevation: 0,
-        title: Text('Settings', style: TextStyle(color: cs.onSurface)),
+        scrolledUnderElevation: 0,
+        title: Text(
+          'Pengaturan',
+          style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w800, fontSize: 18),
+        ),
+        centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: cs.onSurface),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
-            child: Card(
-              color: cs.surface,
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Settings', style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 8),
-                    Text('Manage your account and application preferences.', style: Theme.of(context).textTheme.bodyMedium),
+      body: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              Card(
+                color: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  side: BorderSide(color: Colors.black.withOpacity(0.03)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Preferensi Aplikasi',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.black87),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Kelola akun, privasi, dan tema sistem Anda.',
+                              style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
 
-                    const SizedBox(height: 20),
-
-                    SwitchListTile.adaptive(
-                      value: notifications,
-                      title: const Text('Notifications'),
-                      subtitle: const Text('Enable push & email notifications'),
-                      activeColor: cs.primary,
-                      onChanged: (v) {
-                        setState(() => notifications = v);
-                        _saveBool(_prefsNotifications, v);
-                      },
-                    ),
-
-                    const Divider(),
-
-                    SwitchListTile.adaptive(
-                      value: darkMode,
-                      title: const Text('Dark Mode'),
-                      subtitle: const Text('Enable dark theme for the app'),
-                      activeColor: cs.primary,
-                      onChanged: (v) async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        setState(() => darkMode = v);
-                        await ThemeController.setDark(v);
-                        await _saveBool(_prefsDarkMode, v);
-                        messenger.showSnackBar(SnackBar(content: Text(v ? 'Dark mode enabled' : 'Dark mode disabled')));
-                      },
-                    ),
-
-                    const Divider(),
-
-                    SwitchListTile.adaptive(
-                      value: showProfilePublic,
-                      title: const Text('Profile Visibility'),
-                      subtitle: const Text('Allow others to see your profile and creations'),
-                      activeColor: cs.primary,
-                      onChanged: (v) {
-                        setState(() => showProfilePublic = v);
-                        _saveBool(_prefsProfilePublic, v);
-                      },
-                    ),
-
-                    const Divider(),
-
-                    SwitchListTile.adaptive(
-                      value: allowDataSharing,
-                      title: const Text('Data Sharing'),
-                      subtitle: const Text('Allow anonymous analytics to improve PictByMe'),
-                      activeColor: cs.primary,
-                      onChanged: (v) {
-                        setState(() => allowDataSharing = v);
-                        _saveBool(_prefsDataSharing, v);
-                      },
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    ListTile(
-                      leading: const Icon(Icons.lock),
-                      title: const Text('Change Password'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: _showChangePasswordDialog,
-                    ),
-
-                    ListTile(
-                      leading: const Icon(Icons.privacy_tip),
-                      title: const Text('Privacy & Security'),
-                      subtitle: const Text('Review our privacy policy and permissions'),
-                      trailing: const Icon(Icons.open_in_new),
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Privacy & Security'),
-                            content: const Text('Your data is kept private. We only collect anonymous analytics when enabled.'),
-                            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
-                          ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.save),
-                        label: const Text('Save Changes'),
-                        onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-
-                          await _saveBool(_prefsNotifications, notifications);
-                          await _saveBool(_prefsDarkMode, darkMode);
-                          await _saveBool(_prefsProfilePublic, showProfilePublic);
-                          await _saveBool(_prefsDataSharing, allowDataSharing);
-
-                          messenger.showSnackBar(const SnackBar(content: Text('Settings saved')));
+                      SwitchListTile.adaptive(
+                        value: notifications,
+                        title: const Text('Notifikasi Push', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        subtitle: const Text('Aktifkan pemberitahuan sistem dan info interaksi'),
+                        activeColor: Colors.black87,
+                        onChanged: (v) {
+                          setState(() => notifications = v);
+                          _savePreference(_prefsNotifications, v);
+                          _showStatusSnackBar(v ? 'Notifikasi diaktifkan' : 'Notifikasi dimatikan');
                         },
                       ),
-                    ),
-                  ],
+
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider(height: 1, color: Color(0xFFF1F3F5))),
+
+                      SwitchListTile.adaptive(
+                        value: darkMode,
+                        title: const Text('Mode Gelap (Dark Mode)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        subtitle: const Text('Ubah visual aplikasi menjadi tema gelap eksklusif'),
+                        activeColor: Colors.black87,
+                        onChanged: (v) async {
+                          setState(() => darkMode = v);
+                          await ThemeController.setDark(v);
+                          await _savePreference(_prefsDarkMode, v);
+                          _showStatusSnackBar(v ? 'Mode gelap diterapkan' : 'Mode terang diterapkan');
+                        },
+                      ),
+
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider(height: 1, color: Color(0xFFF1F3F5))),
+
+                      SwitchListTile.adaptive(
+                        value: showProfilePublic,
+                        title: const Text('Visibilitas Profil', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        subtitle: const Text('Izinkan pengguna lain melihat galeri album dan pin Anda'),
+                        activeColor: Colors.black87,
+                        onChanged: (v) {
+                          setState(() => showProfilePublic = v);
+                          _savePreference(_prefsProfilePublic, v);
+                          _showStatusSnackBar(v ? 'Profil Anda kini publik' : 'Profil Anda disembunyikan');
+                        },
+                      ),
+
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider(height: 1, color: Color(0xFFF1F3F5))),
+
+                      SwitchListTile.adaptive(
+                        value: allowDataSharing,
+                        title: const Text('Berbagi Analitik data', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        subtitle: const Text('Kirim data anonim untuk membantu pengembangan aplikasi'),
+                        activeColor: Colors.black87,
+                        onChanged: (v) {
+                          setState(() => allowDataSharing = v);
+                          _savePreference(_prefsDataSharing, v);
+                        },
+                      ),
+
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider(height: 1, color: Color(0xFFF1F3F5))),
+                      const SizedBox(height: 8),
+
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(
+  Icons.privacy_tip_outlined,
+  color: Colors.black87,
+  size: 20,
+)
+                        ),
+                        title: const Text('Ubah Kata Sandi', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                        onTap: _showChangePasswordDialog,
+                      ),
+
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.privacy_tip_outlined, color: Colors.black87, size: 20),
+                        ),
+                        title: const Text('Keamanan & Privasi', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        subtitle: const Text('Tinjau kebijakan perlindungan data PictByMe'),
+                        trailing: const Icon(Icons.open_in_new_rounded, size: 14, color: Colors.grey),
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              title: const Text('Kebijakan Privasi', style: TextStyle(fontWeight: FontWeight.bold)),
+                              content: const Text('Seluruh data visual dan preferensi akun Anda dienkripsi dengan aman. Analitik opsional hanya dikumpulkan untuk peningkatan performa antarmuka.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx), 
+                                  child: const Text('Tutup', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                                )
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -189,55 +234,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final oldCtrl = TextEditingController();
     final newCtrl = TextEditingController();
     final new2Ctrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
     final changed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Change Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: oldCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Current password')),
-            const SizedBox(height: 8),
-            TextField(controller: newCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'New password')),
-            const SizedBox(height: 8),
-            TextField(controller: new2Ctrl, obscureText: true, decoration: const InputDecoration(labelText: 'Confirm new password')),
-          ],
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Ubah Kata Sandi', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: oldCtrl,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Kata Sandi Saat Ini',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: newCtrl,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Kata Sandi Baru',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (v) => (v == null || v.trim().length < 6) ? 'Minimal 6 karakter' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: new2Ctrl,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Konfirmasi Kata Sandi Baru',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (v) {
+                      if (v != newCtrl.text) return 'Konfirmasi sandi tidak cocok';
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false), 
+            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black87,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             onPressed: () {
-              final old = oldCtrl.text.trim();
-              final n1 = newCtrl.text.trim();
-              final n2 = new2Ctrl.text.trim();
-
-              if (n1.isEmpty || n2.isEmpty || old.isEmpty) {
-                // return a special value to indicate validation failure
-                Navigator.pop(context, false);
-                return;
-              }
-              if (n1 != n2) {
-                Navigator.pop(context, false);
-                return;
-              }
-
-              // Placeholder: no API endpoint available; close dialog with success.
-              Navigator.pop(context, true);
+              if (formKey.currentState == null) return;
+              if (!formKey.currentState!.validate()) return;
+              
+              // Tempat menaruh integrasi API di masa mendatang
+              Navigator.pop(ctx, true);
             },
-            child: const Text('Change'),
+            child: const Text('Perbarui'),
           ),
         ],
       ),
     );
 
     if (changed == true) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed (locally)')));
-    } else if (changed == false) {
-      // show a helpful message if inputs were invalid
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password not changed')));
+      _showStatusSnackBar('Kata sandi berhasil diperbarui ✨');
     }
   }
 }

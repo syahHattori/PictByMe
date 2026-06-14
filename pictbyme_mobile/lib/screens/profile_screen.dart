@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import '../services/api_service.dart';
+import '../services/coin_controller.dart';
 import 'boards_screen.dart';
 import 'topup_screen.dart';
 import 'landing_screen.dart';
@@ -38,7 +40,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final resp = await apiService.getProfile();
       if (resp.statusCode == 200 && resp.data != null && resp.data['user'] != null) {
-        setState(() => profile = Map<String, dynamic>.from(resp.data['user']));
+        final userData = Map<String, dynamic>.from(resp.data['user']);
+        setState(() => profile = userData);
+        
+        // Sinkronisasi balance koin terbaru ke controller global aplikasi
+        final currentBalance = userData['coin_balance'] ?? 0;
+        await CoinController().setBalance(currentBalance);
       }
     } catch (_) {}
     setState(() => loadingProfile = false);
@@ -105,21 +112,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (c) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(controller: nameCtrl, decoration: InputDecoration(labelText: 'Name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
-              const SizedBox(height: 12),
-              TextFormField(controller: usernameCtrl, decoration: InputDecoration(labelText: 'Username', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
-              const SizedBox(height: 12),
-              TextFormField(controller: emailCtrl, decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
-            ],
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 6),
+                  TextFormField(controller: nameCtrl, decoration: InputDecoration(labelText: 'Name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: usernameCtrl, decoration: InputDecoration(labelText: 'Username', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: emailCtrl, decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
+                ],
+              ),
+            ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             onPressed: () async {
@@ -194,7 +207,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (upd.statusCode == 200) {
         await _loadProfile();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Avatar berhasil diupdate', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Avatar berhasil diupdate ✨', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating));
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengupdate avatar: ${upd.statusCode}')));
@@ -219,21 +232,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (c) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(controller: currentCtrl, decoration: InputDecoration(labelText: 'Current password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), obscureText: true, validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
-              const SizedBox(height: 12),
-              TextFormField(controller: newCtrl, decoration: InputDecoration(labelText: 'New password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), obscureText: true, validator: (v) => (v == null || v.length < 6) ? 'Min 6 chars' : null),
-              const SizedBox(height: 12),
-              TextFormField(controller: confirmCtrl, decoration: InputDecoration(labelText: 'Confirm password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), obscureText: true, validator: (v) => v != newCtrl.text ? 'Passwords do not match' : null),
-            ],
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 6),
+                  TextFormField(controller: currentCtrl, decoration: InputDecoration(labelText: 'Current password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), obscureText: true, validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: newCtrl, decoration: InputDecoration(labelText: 'New password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), obscureText: true, validator: (v) => (v == null || v.length < 6) ? 'Min 6 chars' : null),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: confirmCtrl, decoration: InputDecoration(labelText: 'Confirm password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), obscureText: true, validator: (v) => v != newCtrl.text ? 'Passwords do not match' : null),
+                ],
+              ),
+            ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             onPressed: () async {
@@ -241,8 +260,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (!formKey.currentState!.validate()) return;
               try {
                 final resp = await apiService.changePassword(currentPassword: currentCtrl.text, newPassword: newCtrl.text, newPasswordConfirmation: confirmCtrl.text);
-                if (resp.statusCode == 200) Navigator.pop(c, true);
-                else ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${resp.statusCode}')));
+                if (resp.statusCode == 200) {
+                  Navigator.pop(c, true);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password berhasil diubah'), backgroundColor: Colors.green));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${resp.statusCode}')));
+                }
               } catch (_) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Change password failed')));
               }
@@ -289,11 +312,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final hasProfilePic = profile?['profile_picture'] != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Latar belakang abu-abu sangat muda (clean look)
-      extendBodyBehindAppBar: true, // Appbar transparan melayang di atas konten
+      backgroundColor: const Color(0xFFF8F9FA),
+      extendBodyBehindAppBar: true, 
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
@@ -316,9 +340,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 clipBehavior: Clip.none,
                 alignment: Alignment.bottomCenter,
                 children: [
-                  // Cover Image Background
                   Container(
-                    height: 240, // Sedikit lebih tinggi
+                    height: 240, 
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 60), 
                     decoration: BoxDecoration(
@@ -327,7 +350,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ? DecorationImage(image: NetworkImage(profile!['cover_url']), fit: BoxFit.cover)
                           : null,
                     ),
-                    // Gradient overlay agar avatar lebih pop out
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -342,15 +364,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   
-                  // Avatar with Premium Gradient Ring & Floating Camera
                   Positioned(
                     bottom: 0,
                     child: Stack(
                       alignment: Alignment.bottomRight,
                       children: [
-                        // Gradient Ring (Ala Story Instagram)
                         Container(
-                          padding: const EdgeInsets.all(4), // Ketebalan ring
+                          padding: const EdgeInsets.all(4),
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
@@ -360,10 +380,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           child: Container(
-                            padding: const EdgeInsets.all(3), // Jarak putih antara ring dan foto
+                            padding: const EdgeInsets.all(3),
                             decoration: const BoxDecoration(color: Color(0xFFF8F9FA), shape: BoxShape.circle),
                             child: CircleAvatar(
-                              radius: 64, // Lebih besar
+                              radius: 64,
                               backgroundColor: Colors.grey[200],
                               backgroundImage: hasProfilePic ? NetworkImage(profile!['profile_picture']) as ImageProvider : null,
                               child: !hasProfilePic 
@@ -373,7 +393,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         
-                        // Sleek Floating Camera Button
                         Positioned(
                           right: 4,
                           bottom: 4,
@@ -386,11 +405,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                                 boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.15),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  )
+                                  BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 4))
                                 ],
                               ),
                               child: uploadingAvatar
@@ -420,7 +435,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 20),
 
-              // Premium Style Edit Profile Button
               ElevatedButton.icon(
                 onPressed: _showEditProfileDialog,
                 icon: const Icon(Icons.edit_rounded, size: 18),
@@ -436,7 +450,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 28),
 
-              // --- STATS ROW (Floating Card) ---
+              // --- STATS ROW (Floating Card dengan Koin Reaktif) ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 padding: const EdgeInsets.symmetric(vertical: 20),
@@ -444,11 +458,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    )
+                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 8))
                   ],
                 ),
                 child: Row(
@@ -457,7 +467,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Container(height: 40, width: 1, color: Colors.grey[200]),
                     _buildStatItem('0', 'Boards'),
                     Container(height: 40, width: 1, color: Colors.grey[200]),
-                    _buildStatItem('${profile?['coin_balance'] ?? 0}', 'Coins'),
+                    
+                    // ValueListenableBuilder memantau CoinController secara realtime
+                    ValueListenableBuilder<int>(
+                      valueListenable: CoinController().balance,
+                      builder: (context, balanceValue, _) {
+                        return _buildStatItem('$balanceValue', 'Coins');
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -491,7 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 32),
 
-              // --- CREATIONS GRID ---
+              // --- CREATIONS GRID (Masonry Fleksibel Multiplatform) ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
@@ -524,53 +541,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 child: const Center(child: Text('No creations yet', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500))),
                               )
                             : LayoutBuilder(builder: (context, constraints) {
-                                final left = <Map>[];
-                                final right = <Map>[];
-                                for (var i = 0; i < pins.length; i++) {
-                                  final p = pins[i] as Map;
-                                  if (i % 2 == 0) left.add(p); else right.add(p);
-                                }
+                                final width = constraints.maxWidth;
+                                // Menentukan jumlah kolom grid dinamis (2 untuk HP, hingga 5 untuk desktop)
+                                final crossAxisCount = (width / 180).floor().clamp(2, 5);
 
-                                double columnWidth = (constraints.maxWidth - 16) / 2;
-
-                                Widget buildColumn(List<Map> items) => Column(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                                      children: items.asMap().entries.map((e) {
-                                        final idx = e.key;
-                                        final p = e.value;
-                                        final h = 160.0 + (idx % 3) * 40; // Variasi tinggi lebih dinamis
-                                        return GestureDetector(
-                                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: p))),
-                                          child: Container(
-                                            width: columnWidth,
-                                            margin: const EdgeInsets.only(bottom: 16),
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(16),
-                                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 4))],
-                                            ),
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(16),
-                                              child: Image.network(p['file_url'].toString(), height: h, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: Colors.grey[200], height: h, child: const Icon(Icons.broken_image, color: Colors.grey))),
+                                return MasonryGridView.count(
+                                  crossAxisCount: crossAxisCount,
+                                  mainAxisSpacing: 12,
+                                  crossAxisSpacing: 12,
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(), // Scroll diatur oleh parent SingleChildScrollView
+                                  itemCount: pins.length,
+                                  itemBuilder: (context, index) {
+                                    final p = pins[index] as Map;
+                                    return GestureDetector(
+                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: p))),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(16),
+                                          boxShadow: [
+                                            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))
+                                          ],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: Image.network(
+                                            p['file_url'].toString(),
+                                            fit: BoxFit.cover,
+                                            loadingBuilder: (context, child, progress) {
+                                              if (progress == null) return child;
+                                              return Container(
+                                                height: 160,
+                                                color: Colors.grey[50],
+                                                child: const Center(
+                                                  child: SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black26),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            errorBuilder: (c, e, s) => Container(
+                                              color: Colors.grey[200], 
+                                              height: 150, 
+                                              child: const Icon(Icons.broken_image, color: Colors.grey)
                                             ),
                                           ),
-                                        );
-                                      }).toList(),
+                                        ),
+                                      ),
                                     );
-
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(child: buildColumn(left)),
-                                    const SizedBox(width: 16),
-                                    Expanded(child: buildColumn(right)),
-                                  ],
+                                  },
                                 );
                               }),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 40), // Bottom padding
+              const SizedBox(height: 40),
             ],
           ),
         ),

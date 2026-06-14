@@ -1,4 +1,3 @@
-
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -54,41 +53,44 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
   Future<void> pickImage() async {
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      try {
-        const maxBytes = 8 * 1024 * 1024; // 8 MB
-        int fileSize = 0;
-        if (kIsWeb) {
-          final bytes = await image.readAsBytes();
-          fileSize = bytes.length;
-          if (fileSize > maxBytes) {
-            _showSnackBar('File terlalu besar (maksimal 8MB)', Colors.redAccent);
-            return;
-          }
-          setState(() {
-            selectedImage = image;
-            selectedImageBytes = bytes;
-          });
-        } else {
-          fileSize = await image.length();
-          if (fileSize > maxBytes) {
-            _showSnackBar('File terlalu besar (maksimal 8MB)', Colors.redAccent);
-            return;
-          }
-          setState(() {
-            selectedImage = image;
-          });
+    if (image == null) return;
+
+    try {
+      const maxBytes = 8 * 1024 * 1024; // 8 MB
+      int fileSize = 0;
+      
+      if (kIsWeb) {
+        final bytes = await image.readAsBytes();
+        if (!mounted) return;
+        fileSize = bytes.length;
+        if (fileSize > maxBytes) {
+          _showSnackBar('File terlalu besar (maksimal 8MB)', Colors.redAccent);
+          return;
         }
-      } catch (e) {
-        debugPrint('Error checking file size: $e');
+        setState(() {
+          selectedImage = image;
+          selectedImageBytes = bytes;
+        });
+      } else {
+        fileSize = await image.length();
+        if (!mounted) return;
+        if (fileSize > maxBytes) {
+          _showSnackBar('File terlalu besar (maksimal 8MB)', Colors.redAccent);
+          return;
+        }
         setState(() {
           selectedImage = image;
         });
       }
+    } catch (e) {
+      debugPrint('Error checking file size: $e');
+      if (!mounted) return;
+      setState(() {
+        selectedImage = image;
+      });
     }
   }
 
-  // FEATURE: Allow user to clear selected image easily
   void clearSelectedImage() {
     setState(() {
       selectedImage = null;
@@ -98,6 +100,7 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
   }
 
   void _showSnackBar(String message, [Color? bgColor]) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
@@ -112,6 +115,7 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
     try {
       final response = await apiService.getCategories();
       final data = response.data != null && response.data['data'] != null ? response.data['data'] as List : [];
+      if (!mounted) return;
       setState(() {
         if (data.isNotEmpty) {
           categories = data;
@@ -121,6 +125,7 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
       });
     } catch (e) {
       debugPrint(e.toString());
+      if (!mounted) return;
       setState(() {
         categories = List<Map<String, Object>>.from(defaultCategories);
       });
@@ -171,7 +176,8 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
           if (resp.statusCode == 200 && resp.data != null && resp.data['file_url'] != null) {
             fileUrl = resp.data['file_url'];
             imageUrlController.text = fileUrl;
-            if (Platform.isAndroid) {
+            // AMAN KROSS-PLATFORM: Mencegah crash pemanggilan Platform di Web browser
+            if (!kIsWeb && Platform.isAndroid) {
               imageUrlController.text = imageUrlController.text.replaceAll('localhost', '10.0.2.2');
             }
           } else {
@@ -192,7 +198,6 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
 
       if (!mounted) return;
       _showSnackBar('Pin beres dibuat dan siap dibagikan!', Colors.green);
-      // Return info to caller so they can react (e.g., show in Marketplace)
       Navigator.pop(context, {'isPaid': price > 0});
     } catch (e) {
       debugPrint("===== UPLOAD ERROR =====");
@@ -224,10 +229,11 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
     final hasImage = selectedImage != null || selectedImageBytes != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Konsisten dengan skema Profile
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
         title: const Text(
           'Buat Pin Baru',
@@ -246,7 +252,7 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- SECTION 1: MODERN DRAG/PICK IMAGE CONTAINER ---
+                    // --- SECTION 1: VISUAL INSPIRASI ---
                     const Text('Visual Inspirasi', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87)),
                     const SizedBox(height: 8),
                     GestureDetector(
@@ -287,7 +293,6 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                                           : Image.file(File(selectedImage!.path), fit: BoxFit.cover),
                                     ),
                                   ),
-                                  // FEATURE BUTTON: Clear/Remove image selection smoothly
                                   Positioned(
                                     top: 12,
                                     right: 12,
@@ -311,14 +316,13 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                     const Text('Detail Informasi', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87)),
                     const SizedBox(height: 12),
 
-                    // Title Field with Feature Counter
                     TextFormField(
                       controller: titleController,
                       maxLength: 50,
                       decoration: InputDecoration(
                         labelText: 'Judul Pin',
                         hintText: 'Beri judul yang menarik perhatian...',
-                        counterText: '', // Sembunyikan counter bawaan agar terlihat clean
+                        counterText: '',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                         filled: true,
                         fillColor: Colors.white,
@@ -327,14 +331,13 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Description Field
                     TextFormField(
                       controller: descriptionController,
                       maxLines: 4,
                       maxLength: 250,
                       decoration: InputDecoration(
-                        labelText: 'Deskripsi Tambahan',
-                        hintText: 'Ceritakan detail, proses, atau filosofi dibalik gambar ini...',
+                        labelText: 'Deskripsi Utama',
+                        hintText: 'Ceritakan filosofi atau detail di balik gambar ini...',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                         filled: true,
                         fillColor: Colors.white,
@@ -343,7 +346,7 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Category Selector Row Component
+                    // Category Selector
                     Row(
                       children: [
                         Expanded(
@@ -449,7 +452,7 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                             title: const Row(
                               children: [
                                 Icon(Icons.monetization_on_rounded, color: Colors.amber, size: 22),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8),
                                 Text('Komersilkan Pin Ini', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                               ],
                             ),
@@ -488,7 +491,7 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                       height: 54,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black87, // Premium minimalist color accent
+                          backgroundColor: Colors.black87,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -504,7 +507,7 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
             ),
           ),
 
-          // FEATURE OVERLAY: Modern full-screen blur blocking interactions while loading backend data
+          // FULL SCREEN BLUR OVERLAY LOADING
           if (isUploading)
             Container(
               color: Colors.black.withOpacity(0.3),
@@ -524,4 +527,3 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
     );
   }
 }
-

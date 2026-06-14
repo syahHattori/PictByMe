@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../services/coin_controller.dart'; // Pastikan import ini ada
 import 'login_dialog.dart';
 import 'register_dialog.dart';
-
 import '../screens/home_page.dart';
 import '../screens/explore_page.dart';
 import '../screens/features_page.dart';
@@ -12,19 +11,13 @@ import '../screens/profile_screen.dart';
 class CustomNavbar extends StatefulWidget {
   final String activePage;
 
-  const CustomNavbar({
-    super.key,
-    required this.activePage,
-  });
+  const CustomNavbar({super.key, required this.activePage});
 
   @override
-  State<CustomNavbar> createState() =>
-      _CustomNavbarState();
+  State<CustomNavbar> createState() => _CustomNavbarState();
 }
 
-class _CustomNavbarState
-    extends State<CustomNavbar> {
-
+class _CustomNavbarState extends State<CustomNavbar> {
   bool isLoggedIn = false;
 
   @override
@@ -34,217 +27,87 @@ class _CustomNavbarState
   }
 
   Future<void> checkLogin() async {
-    final prefs =
-        await SharedPreferences.getInstance();
-
+    final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
-
-    setState(() {
-      isLoggedIn =
-          prefs.getString('token') != null;
-    });
+    setState(() => isLoggedIn = prefs.getString('token') != null);
   }
 
   Future<void> logout() async {
-    final prefs =
-        await SharedPreferences.getInstance();
-
+    final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
-
     if (!mounted) return;
-
-    setState(() {
-      isLoggedIn = false;
-    });
+    setState(() => isLoggedIn = false);
+    // Refresh navigasi setelah logout
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const HomePage()), (route) => false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme =
-        Theme.of(context).colorScheme;
-
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 70,
-        vertical: 18,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context)
-                .shadowColor
-                .withAlpha(
-                  (0.06 * 255).round(),
-                ),
-            blurRadius: 10,
-          ),
-        ],
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2))],
       ),
       child: Row(
-        mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-
           // LOGO
           Row(
             children: [
-              Icon(
-                Icons.camera_alt_rounded,
-                color: colorScheme.primary,
-                size: 30,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                "PictByMe",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight:
-                      FontWeight.bold,
-                  color:
-                      colorScheme.primary,
-                ),
-              ),
+              const Icon(Icons.camera_alt_rounded, color: Colors.black87, size: 28),
+              const SizedBox(width: 8),
+              const Text("PictByMe", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black87)),
             ],
           ),
 
-          // MENU
+          // MENU NAVIGATION
           Row(
             children: [
-
-              navItem(
-                context,
-                "Home",
-                Icons.home_outlined,
-                const HomePage(),
-              ),
-
-              navItem(
-                context,
-                "Explore",
-                Icons.explore_outlined,
-                const ExplorePage(),
-              ),
-
-              navItem(
-                context,
-                "Features",
-                Icons.auto_awesome_outlined,
-                const FeaturesPage(),
-              ),
-
-              const SizedBox(width: 20),
-
+              navItem("Home", Icons.home_rounded, const HomePage()),
+              navItem("Explore", Icons.explore_rounded, const ExplorePage()),
+              navItem("Features", Icons.auto_awesome_rounded, const FeaturesPage()),
+              const SizedBox(width: 30),
+              
               if (!isLoggedIn) ...[
-
                 OutlinedButton(
                   onPressed: () async {
-
-                    await showDialog(
-                      context: context,
-                      builder: (_) =>
-                          const LoginDialog(),
-                    );
-
+                    await showDialog(context: context, builder: (_) => const LoginDialog());
                     checkLogin();
                   },
-                  child: const Text(
-                    "Login",
-                  ),
+                  style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  child: const Text("Login"),
                 ),
-
-                const SizedBox(width: 10),
-
+                const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) =>
-                          const RegisterDialog(),
-                    );
-                  },
-                  child: const Text(
-                    "Sign Up",
-                  ),
+                  onPressed: () => showDialog(context: context, builder: (_) => const RegisterDialog()),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black87, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  child: const Text("Sign Up"),
                 ),
-
               ] else ...[
-
+                // REAKTIF: Menampilkan saldo dari CoinController
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        Colors.amber.shade100,
-                    borderRadius:
-                        BorderRadius.circular(
-                      20,
-                    ),
-                  ),
-                  child: const Text(
-                    "🪙 100",
-                    style: TextStyle(
-                      fontWeight:
-                          FontWeight.bold,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.amber.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: CoinController().balance,
+                    builder: (context, balance, _) => Text(
+                      "🪙 $balance",
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.amber),
                     ),
                   ),
                 ),
-
-                const SizedBox(width: 15),
-
+                const SizedBox(width: 20),
                 PopupMenuButton<String>(
-                  onSelected:
-                      (value) async {
-
-                    if (value ==
-                        'profile') {
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const ProfileScreen(),
-                        ),
-                      );
-                    }
-
-                    if (value ==
-                        'logout') {
-
-                      await logout();
-                    }
+                  onSelected: (val) {
+                    if (val == 'profile') Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                    if (val == 'logout') logout();
                   },
-
-                  itemBuilder:
-                      (context) => [
-
-                    const PopupMenuItem(
-                      value:
-                          'profile',
-                      child: Text(
-                        'Profile',
-                      ),
-                    ),
-
-                    const PopupMenuItem(
-                      value:
-                          'logout',
-                      child: Text(
-                        'Logout',
-                      ),
-                    ),
+                  child: const CircleAvatar(radius: 20, backgroundColor: Colors.black87, child: Icon(Icons.person, color: Colors.white, size: 20)),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'profile', child: Text('Profil Saya')),
+                    const PopupMenuItem(value: 'logout', child: Text('Keluar', style: TextStyle(color: Colors.red))),
                   ],
-
-                  child:
-                      const CircleAvatar(
-                    radius: 20,
-                    child: Icon(
-                      Icons.person,
-                    ),
-                  ),
                 ),
               ],
             ],
@@ -254,63 +117,22 @@ class _CustomNavbarState
     );
   }
 
-  Widget navItem(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Widget page,
-  ) {
-    final cs =
-        Theme.of(context).colorScheme;
-
-    final bool isActive =
-        widget.activePage == title;
-
+  Widget navItem(String title, IconData icon, Widget page) {
+    final bool isActive = widget.activePage == title;
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 10,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: TextButton.icon(
         onPressed: () {
-
-          if (widget.activePage ==
-              title) {
-            return;
-          }
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => page,
-            ),
-          );
+          if (isActive) return;
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
         },
-        icon: Icon(
-          icon,
-          size: 18,
-          color: isActive
-              ? cs.primary
-              : Theme.of(context)
-                      .textTheme
-                      .bodyLarge
-                      ?.color ??
-                  cs.onSurface,
-        ),
+        icon: Icon(icon, size: 18, color: isActive ? Colors.black87 : Colors.grey[600]),
         label: Text(
           title,
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: isActive
-                ? FontWeight.bold
-                : FontWeight.normal,
-            color: isActive
-                ? cs.primary
-                : Theme.of(context)
-                        .textTheme
-                        .bodyLarge
-                        ?.color ??
-                    cs.onSurface,
+            fontSize: 15,
+            fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+            color: isActive ? Colors.black87 : Colors.grey[600],
           ),
         ),
       ),

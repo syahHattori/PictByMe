@@ -35,19 +35,43 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
   }
 
   Future<bool> showEditDialog(Map pin) async {
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: EditPinWidget(pin: pin, categories: categories),
-        );
-      },
-    );
-    return (result == true);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 800;
+
+    if (isMobile) {
+      // Tampilan Mobile: Menggunakan Bottom Sheet dari bawah layar
+      final result = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (ctx) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: EditPinWidget(pin: pin, categories: categories),
+          );
+        },
+      );
+      return (result == true);
+    } else {
+      // Tampilan Desktop/Web: Diubah menjadi Dialog Tengah yang proporsional
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Colors.white,
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 500),
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: EditPinWidget(pin: pin, categories: categories),
+            ),
+          ),
+        ),
+      );
+      return (result == true);
+    }
   }
 
   Future<void> loadMyPins() async {
@@ -85,7 +109,11 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent, 
+              foregroundColor: Colors.white, 
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () => Navigator.pop(ctx, true), 
             child: const Text('Hapus')
           ),
@@ -118,14 +146,15 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
         Navigator.of(context).pop(_changed);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA), // Latar belakang clean/soft grey
+        backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
           elevation: 0,
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.white,
+          scrolledUnderElevation: 0,
           iconTheme: const IconThemeData(color: Colors.black87),
           title: const Text(
             'Koleksi Pin Saya',
-            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 18),
+            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18),
           ),
           centerTitle: true,
         ),
@@ -147,15 +176,14 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
                   )
                 : LayoutBuilder(builder: (context, constraints) {
                     final width = constraints.maxWidth;
-                    
-                    // Menentukan jumlah kolom secara dinamis berdasarkan lebar layar (2 kolom untuk mobile, lebih banyak untuk tablet/desktop)
-                    final crossAxisCount = (width / 180).floor().clamp(2, 5);
+                    // Skala grid fleksibel: 2 kolom di HP cerdas, hingga 5 kolom di monitor lebar
+                    final crossAxisCount = (width / 220).floor().clamp(2, 5);
 
                     return MasonryGridView.count(
                       crossAxisCount: crossAxisCount,
-                      mainAxisSpacing: 10, // Jarak vertikal antar-pin super rapat ala Pinterest
-                      crossAxisSpacing: 10, // Jarak horizontal antar-pin
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      padding: const EdgeInsets.all(16),
                       itemCount: pins.length,
                       itemBuilder: (context, index) {
                         final pin = pins[index];
@@ -165,133 +193,153 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
+                                color: Colors.black.withOpacity(0.04),
                                 blurRadius: 8,
-                                offset: const Offset(0, 3),
+                                offset: const Offset(0, 2),
                               )
                             ],
                           ),
-                          child: InkWell(
+                          child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin))),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: Stack(
-                                children: [
-                                  // --- KOMPONEN 1: UTAMA - GAMBAR MURNI (EDGE-TO-EDGE) ---
-                                  Image.network(
-                                    pin['file_url'].toString(),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (c, e, st) => Container(
-                                      height: 150,
-                                      color: Colors.grey[100],
-                                      child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.grey)),
-                                    ),
-                                  ),
-
-                                  // --- KOMPONEN 2: GRADIENT OVERLAY (Untuk Membaca Judul di Bagian Bawah) ---
-                                  Positioned.fill(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.black.withOpacity(0.0),
-                                            Colors.black.withOpacity(0.0),
-                                            Colors.black.withOpacity(0.1),
-                                            Colors.black.withOpacity(0.55),
-                                          ],
+                            child: Stack(
+                              children: [
+                                // --- KOMPONEN 1: GAMBAR MURNI ---
+                                Image.network(
+                                  pin['file_url'].toString(),
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return Container(
+                                      height: 180,
+                                      color: Colors.grey[50],
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black26),
                                         ),
                                       ),
-                                    ),
+                                    );
+                                  },
+                                  errorBuilder: (c, e, st) => Container(
+                                    height: 150,
+                                    color: Colors.grey[100],
+                                    child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.grey)),
                                   ),
+                                ),
 
-                                  // --- KOMPONEN 3: FLOATING MENU TITIK 3 (Kanan Atas) ---
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: Container(
-                                      height: 32,
-                                      width: 32,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.85),
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
-                                            blurRadius: 4,
-                                          )
+                                // --- KOMPONEN 2: GRADIENT OVERLAY ---
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.black.withOpacity(0.0),
+                                          Colors.black.withOpacity(0.0),
+                                          Colors.black.withOpacity(0.1),
+                                          Colors.black.withOpacity(0.6),
                                         ],
                                       ),
-                                      child: Theme(
-                                        data: Theme.of(context).copyWith(
-                                          hoverColor: Colors.transparent,
-                                          splashColor: Colors.transparent,
-                                        ),
-                                        child: PopupMenuButton<int>(
-                                          padding: EdgeInsets.zero,
-                                          icon: const Icon(Icons.more_horiz_rounded, color: Colors.black87, size: 18),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                          onSelected: (choice) async {
-                                            if (choice == 1) {
-                                              final updated = await showEditDialog(pin);
-                                              if (updated) {
-                                                _showSnackBar('Pin berhasil diperbarui', Colors.green);
-                                                await loadMyPins();
-                                              }
-                                            } else if (choice == 2) {
-                                              await _deletePinAction(pin);
-                                            }
-                                          },
-                                          itemBuilder: (_) => const [
-                                            PopupMenuItem(
-                                              value: 1, 
-                                              child: ListTile(
-                                                dense: true,
-                                                leading: Icon(Icons.edit_rounded, color: Colors.blueAccent, size: 20), 
-                                                title: Text('Edit Pin', style: TextStyle(fontWeight: FontWeight.w600))
-                                              )
-                                            ),
-                                            PopupMenuItem(
-                                              value: 2, 
-                                              child: ListTile(
-                                                dense: true,
-                                                leading: Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20), 
-                                                title: Text('Hapus', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.redAccent))
-                                              )
-                                            ),
-                                          ],
-                                        ),
-                                      ),
                                     ),
                                   ),
+                                ),
 
-                                  // --- KOMPONEN 4: TEKS JUDUL MENGAMBANG (Kiri Bawah) ---
-                                  Positioned(
-                                    left: 10,
-                                    right: 10,
-                                    bottom: 10,
-                                    child: Text(
-                                      pin['title'] ?? 'Tanpa Judul',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                        shadows: [
-                                          Shadow(
-                                            offset: Offset(0, 1),
-                                            blurRadius: 4,
-                                            color: Colors.black38,
+                                // --- KOMPONEN 3: TEKS JUDUL (Kiri Bawah) ---
+                                Positioned(
+                                  left: 12,
+                                  right: 45, // Memberikan ruang agar teks tidak menabrak tombol menu titik tiga jika sejajar
+                                  bottom: 12,
+                                  child: Text(
+                                    pin['title'] ?? 'Tanpa Judul',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      shadows: [
+                                        Shadow(offset: Offset(0, 1), blurRadius: 4, color: Colors.black45),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                // --- KOMPONEN 4: LAPISAN KLIK AKTIF (INKWELL) ---
+                                Positioned.fill(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin))),
+                                    ),
+                                  ),
+                                ),
+
+                                // --- KOMPONEN 5: FLOATING MENU TITIK 3 (Kanan Atas) ---
+                                // Diletakkan paling atas agar deteksi ketukan PopupMenuButton tidak terhalang InkWell utama
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Container(
+                                    height: 32,
+                                    width: 32,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.9),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 2))
+                                      ],
+                                    ),
+                                    child: Theme(
+                                      data: Theme.of(context).copyWith(
+                                        hoverColor: Colors.transparent,
+                                        splashColor: Colors.transparent,
+                                      ),
+                                      child: PopupMenuButton<int>(
+                                        padding: EdgeInsets.zero,
+                                        icon: const Icon(Icons.more_horiz_rounded, color: Colors.black87, size: 18),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                        onSelected: (choice) async {
+                                          if (choice == 1) {
+                                            final updated = await showEditDialog(pin);
+                                            if (updated) {
+                                              _showSnackBar('Pin berhasil diperbarui', Colors.green);
+                                              await loadMyPins();
+                                            }
+                                          } else if (choice == 2) {
+                                            await _deletePinAction(pin);
+                                          }
+                                        },
+                                        itemBuilder: (_) => const [
+                                          PopupMenuItem(
+                                            value: 1, 
+                                            child: ListTile(
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                             leading: Icon(
+  Icons.edit_rounded,
+  color: Colors.blue,
+  size: 18,
+),
+                                              title: Text('Edit Pin', style: TextStyle(fontWeight: FontWeight.w600))
+                                            )
+                                          ),
+                                          PopupMenuItem(
+                                            value: 2, 
+                                            child: ListTile(
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                              leading: Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18), 
+                                              title: Text('Hapus', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.redAccent))
+                                            )
                                           ),
                                         ],
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                         );
