@@ -421,9 +421,171 @@ Future<Response> createBoard({
       ),
     );
   }
+  Future<Response> getUnreadNotificationCount() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.get(
+    '/notifications/unread-count',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+Future<Response> getPurchasedPins() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.get(
+    '/purchases/my-pins',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+Future<Response> markNotificationsRead() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.post(
+    '/notifications/read-all',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
 Future<Response> getCategories() async {
   return await dio.get(
     '/categories',
+  );
+}
+Future<Response> getAdminUsers() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.get(
+    '/admin/users',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+
+Future<Response> updateUserCoins({
+  required int userId,
+  required int coins,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.put(
+    '/admin/users/$userId/coins',
+    data: {
+      'coin_balance': coins,
+    },
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+
+Future<Response> resetUserPassword({
+  required int userId,
+  required String password,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.put(
+    '/admin/users/$userId/password',
+    data: {
+      'password': password,
+    },
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+Future<Response> getAdminDashboard() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.get(
+    '/admin/dashboard',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+Future<Response> deleteUser({
+  required int userId,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.delete(
+    '/admin/users/$userId',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+Future<Response> getAdminPins() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.get(
+    '/admin/pins',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+
+Future<Response> deleteAdminPin({
+  required int pinId,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.delete(
+    '/admin/pins/$pinId',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
+Future<Response> getAdminPurchases() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.get(
+    '/admin/purchases',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
   );
 }
 

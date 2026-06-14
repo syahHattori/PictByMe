@@ -26,17 +26,42 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _loadPaidPins();
   }
 
-  Future<void> _loadPaidPins() async {
-    try {
-      final resp = await api.getPinsFiltered(paid: true);
-      final all = resp.data['data'] as List<dynamic>;
-      setState(() {
-        paidPins = all.where((p) => (p['price_coin'] ?? 0) > 0).toList();
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() => isLoading = false);
-    }
+ Future<void> _loadPaidPins() async {
+  try {
+    final resp = await api.getPinsFiltered(paid: true);
+final purchased = await api.getPurchasedPins();
+    print("API RESPONSE:");
+    print(resp.data);
+
+    final all = resp.data['data'] as List<dynamic>;
+    final purchasedIds = (purchased.data['data'] as List)
+    .map((e) => e['id'])
+    .toSet();
+
+    print("TOTAL DATA: ${all.length}");
+
+    setState(() {
+      paidPins = all.where((p) {
+        print(
+          "${p['title']} | price=${p['price_coin']} | premium=${p['is_premium']}"
+        );
+
+        final price = int.tryParse(
+          p['price_coin'].toString(),
+        ) ?? 0;
+
+       return price > 0 &&
+       !purchasedIds.contains(p['id']);
+      }).toList();
+
+      print("SHOWING: ${paidPins.length}");
+
+      isLoading = false;
+    });
+  } catch (e) {
+    print("MARKETPLACE ERROR: $e");
+    setState(() => isLoading = false);
+  }
 
     // Fallback data tiruan jika backend kosong / lokal dev
     if (mounted && paidPins.isEmpty) {

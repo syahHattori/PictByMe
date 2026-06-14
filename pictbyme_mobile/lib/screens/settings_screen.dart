@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/theme_controller.dart';
 
+import 'admin_dashboard_screen.dart';
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -192,7 +193,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
                         onTap: _showChangePasswordDialog,
                       ),
-
+ListTile(
+  leading: Container(
+    padding: const EdgeInsets.all(8),
+    decoration: BoxDecoration(
+      color: Colors.grey[100],
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: const Icon(
+      Icons.admin_panel_settings,
+      color: Colors.black87,
+      size: 20,
+    ),
+  ),
+  title: const Text(
+    'Admin Panel',
+    style: TextStyle(
+      fontWeight: FontWeight.w600,
+      fontSize: 15,
+    ),
+  ),
+  subtitle: const Text(
+    'Kelola user, coin, password dan akun',
+  ),
+  trailing: const Icon(
+    Icons.arrow_forward_ios_rounded,
+    size: 14,
+    color: Colors.grey,
+  ),
+  onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const AdminDashboardScreen(),
+    ),
+  );
+},
+),
                       ListTile(
                         leading: Container(
                           padding: const EdgeInsets.all(8),

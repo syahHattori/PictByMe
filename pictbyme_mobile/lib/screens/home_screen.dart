@@ -25,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isProfileHovered = false;
   int hoveredSidebarIndex = -1;
   bool isNotificationHovered = false;
-  
+  int unreadNotificationCount = 0;
   final ApiService apiService = ApiService();
   List pins = [];
   bool isLoading = true;
@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     loadPins();
+    loadUnreadNotifications();
   }
 
   Future<void> loadPins() async {
@@ -70,7 +71,17 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
   }
+Future<void> loadUnreadNotifications() async {
+  try {
+    final resp = await apiService.getUnreadNotificationCount();
 
+    setState(() {
+      unreadNotificationCount = resp.data['count'] ?? 0;
+    });
+  } catch (e) {
+    debugPrint('NOTIFICATION ERROR: $e');
+  }
+}
   Future<void> _showSaveToBoardDialog(Map pin) async {
     try {
       final resp = await apiService.getBoards();
@@ -463,16 +474,70 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Helper Pembuat Tombol Notifikasi
   Widget _buildNotificationButton(ColorScheme colorScheme) {
-    return _buildTopBarButton(
-      icon: Icons.notifications,
-      isHovered: isNotificationHovered,
-      onHoverChange: (v) => setState(() => isNotificationHovered = v),
-      onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+  return MouseRegion(
+    cursor: SystemMouseCursors.click,
+    onEnter: (_) => setState(() => isNotificationHovered = true),
+    onExit: (_) => setState(() => isNotificationHovered = false),
+    child: GestureDetector(
+      onTap: () async {
+        try {
+          await apiService.markNotificationsRead();
+
+          setState(() {
+            unreadNotificationCount = 0;
+          });
+        } catch (_) {}
+
+        if (!mounted) return;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const NotificationsScreen(),
+          ),
+        );
       },
-      colorScheme: colorScheme,
-    );
-  }
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            padding: const EdgeInsets.all(8),
+            transform: Matrix4.identity()
+              ..scale(isNotificationHovered ? 1.06 : 1.0),
+            decoration: BoxDecoration(
+              color: isNotificationHovered
+                  ? colorScheme.primary.withOpacity(0.08)
+                  : const Color(0xFFF1F3F5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.notifications,
+              color: isNotificationHovered
+                  ? colorScheme.primary
+                  : Colors.black54,
+              size: 20,
+            ),
+          ),
+
+          if (unreadNotificationCount > 0)
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
 
   // Helper Pembuat Tombol Saldo Koin
   Widget _buildCoinButton(ColorScheme colorScheme) {
@@ -554,26 +619,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Helper Pembuat Tombol Topbar Efek Hover
-  Widget _buildTopBarButton({required IconData icon, required bool isHovered, required Function(bool) onHoverChange, required VoidCallback onTap, required ColorScheme colorScheme}) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => onHoverChange(true),
-      onExit: (_) => onHoverChange(false),
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.all(8),
-          transform: Matrix4.identity()..scale(isHovered ? 1.06 : 1.0),
-          decoration: BoxDecoration(
-            color: isHovered ? colorScheme.primary.withOpacity(0.08) : const Color(0xFFF1F3F5),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: isHovered ? colorScheme.primary : Colors.black54, size: 20),
-        ),
-      ),
-    );
-  }
+
 
   // Tampilan ketika data feeds kosong
   Widget _buildEmptyState() {

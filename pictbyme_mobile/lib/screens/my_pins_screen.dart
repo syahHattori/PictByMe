@@ -77,11 +77,17 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
   Future<void> loadMyPins() async {
     setState(() => isLoading = true);
     try {
-      final resp = await apiService.getMyPins();
-      setState(() {
-        pins = resp.data['data'] ?? [];
-        isLoading = false;
-      });
+      final myPinsResp = await apiService.getMyPins();
+final purchasedResp = await apiService.getPurchasedPins();
+
+setState(() {
+  pins = [
+    ...(myPinsResp.data['data'] ?? []),
+    ...(purchasedResp.data['data'] ?? []),
+  ];
+
+  isLoading = false;
+});
     } catch (e) {
       debugPrint(e.toString());
       setState(() => isLoading = false);
