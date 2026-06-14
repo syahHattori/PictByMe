@@ -104,7 +104,7 @@ class PinController extends Controller
                 ], 422);
             }
 
-            $url = Storage::disk('public')->url($path);
+            $url = url('/image/' . basename($path));
 
             Log::info('File uploaded', array_merge($info, ['path' => $path, 'url' => $url]));
 
@@ -154,6 +154,78 @@ class PinController extends Controller
             'message' => 'Pin berhasil dibuat',
             'data' => $pin
         ], 201);
+    }
+
+    /**
+     * Return pins belonging to the authenticated user.
+     */
+    public function mine(Request $request)
+    {
+        $user = $request->user();
+
+        $pins = Pin::with(['user','category'])
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $pins
+        ]);
+    }
+
+    /**
+     * Update a pin owned by the authenticated user.
+     */
+    public function update(Request $request, $id)
+    {
+        $pin = Pin::findOrFail($id);
+
+        // ensure ownership
+        if ($request->user()->id !== $pin->user_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $request->validate([
+            'category_id' => 'required|exists:categories,id',
+            'title' => 'required|max:255',
+            'description' => 'nullable',
+            'price_coin' => 'nullable|integer',
+            'is_premium' => 'boolean'
+        ]);
+
+        $pin->update([
+            'category_id' => $request->category_id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'price_coin' => $request->price_coin ?? $pin->price_coin,
+            'is_premium' => $request->is_premium ?? $pin->is_premium,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pin updated',
+            'data' => $pin
+        ]);
+    }
+
+    /**
+     * Delete a pin owned by the authenticated user.
+     */
+    public function destroy(Request $request, $id)
+    {
+        $pin = Pin::findOrFail($id);
+
+        if ($request->user()->id !== $pin->user_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        try {
+            $pin->delete();
+            return response()->json(['success' => true, 'message' => 'Pin deleted']);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Delete failed', 'error' => $e->getMessage()], 500);
+        }
     }
 }
 

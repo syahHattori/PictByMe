@@ -15,17 +15,13 @@ use App\Http\Controllers\Api\PaymentController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/pins', [PinController::class, 'index']);
-Route::get('/pins/{id}', [PinController::class, 'show']);
-
-/*
-|--------------------------------------------------------------------------
-| Protected Routes
-|--------------------------------------------------------------------------
-*/
 
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::get('/pins/mine', [PinController::class, 'mine']);
 
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -38,8 +34,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/pins', [PinController::class, 'store']);
     Route::post('/pins/upload', [PinController::class, 'upload']);
-
+    Route::put('/pins/{id}', [PinController::class, 'update']);
+    Route::delete('/pins/{id}', [PinController::class, 'destroy']);
     Route::post('/pins/{id}/purchase', [PurchaseController::class, 'store']);
 
     Route::post('/topup', [PaymentController::class, 'generateQr']);
 });
+
+Route::get('/pins/{id}', [PinController::class, 'show']);

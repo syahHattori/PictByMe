@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import '../services/api_service.dart';
 import '../screens/home_screen.dart';
+import 'register_dialog.dart';
 
 class LoginDialog extends StatefulWidget {
   const LoginDialog({super.key});
@@ -25,12 +26,9 @@ final ApiService apiService = ApiService();
 Future<void> login() async {
   try {
     final response = await apiService.login(
-      email: emailController.text,
-      password: passwordController.text,
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
     );
-    debugPrint(
-  "LOGIN RESPONSE: ${response.data}",
-);
 
     if (response.data['success'] == true) {
       final prefs =
@@ -43,6 +41,15 @@ Future<void> login() async {
 
       if (!mounted) return;
 
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Login berhasil',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
       Navigator.pop(context);
 
       Navigator.pushReplacement(
@@ -52,25 +59,51 @@ Future<void> login() async {
         ),
       );
     }
- } catch (e) {
+  } on DioException catch (e) {
+    String message =
+        'Terjadi kesalahan. Silakan coba lagi.';
 
-  debugPrint(
-    "ERROR LOGIN: $e",
-  );
+    if (e.response?.statusCode == 401) {
+      message =
+          'Email atau password salah.';
+    }
 
-  if (e is DioException) {
+    if (e.response?.statusCode == 422) {
+      message =
+          'Data login tidak valid.';
+    }
 
-    debugPrint(
-      "STATUS: ${e.response?.statusCode}",
+    if (e.response?.statusCode == 404) {
+      message =
+          'Akun belum terdaftar.';
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
     );
 
     debugPrint(
-      "BODY: ${e.response?.data}",
+      'LOGIN ERROR: ${e.response?.data}',
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Tidak dapat terhubung ke server.',
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+
+    debugPrint(
+      'ERROR: $e',
     );
   }
+}
 
-}
-}
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -186,7 +219,13 @@ Future<void> login() async {
 
                   Center(
                     child: TextButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.pop(context);
+                        showDialog(
+                          context: context,
+                          builder: (_) => const RegisterDialog(),
+                        );
+                      },
                       child: const Text(
                         "Don't have an account? Register",
                       ),

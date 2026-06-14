@@ -4,8 +4,7 @@ import 'dart:typed_data';
 
 class ApiService {
  static const String baseUrl =
-    'https://api.pictbyme.web.id/api';
-
+    'http://127.0.0.1:8000/api';
   final Dio dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
@@ -49,6 +48,79 @@ class ApiService {
 
   Future<Response> getPins() async {
     return await dio.get('/pins');
+  }
+
+  Future<Response> getProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.get(
+      '/profile',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
+  Future<Response> getMyPins() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    // debug: print token used for authenticated requests
+    print('TOKEN = $token');
+
+    return await dio.get(
+      '/pins/mine',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
+  Future<Response> updatePin({
+    required int pinId,
+    required int categoryId,
+    required String title,
+    String? description,
+    int? priceCoin,
+    bool? isPremium,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.put(
+      '/pins/$pinId',
+      data: {
+        'category_id': categoryId,
+        'title': title,
+        'description': description,
+        'price_coin': priceCoin,
+        'is_premium': isPremium,
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
+  Future<Response> deletePin({required int pinId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.delete(
+      '/pins/$pinId',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
   }
 
   Future<Response> getPinsFiltered({bool paid = false}) async {

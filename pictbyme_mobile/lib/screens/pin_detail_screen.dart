@@ -54,12 +54,7 @@ class PinDetailScreen extends StatelessWidget {
         child: Column(
           children: [
             Image.network(
-  pin['file_url']
-      .toString()
-      .replaceAll(
-        '127.0.0.1',
-        'localhost',
-      ),
+  pin['file_url'].toString(),
 )
 ,
 

@@ -8,6 +8,7 @@ import 'settings_screen.dart';
 import 'topup_screen.dart';
 import 'marketplace_screen.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'my_pins_screen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -37,8 +38,7 @@ int hoveredIndex = -1;
 
   Future<void> loadPins() async {
     try {
-      final response =
-          await apiService.getPins();
+      final response = await apiService.getPins();
 
       setState(() {
         pins = response.data['data'];
@@ -133,6 +133,34 @@ int hoveredIndex = -1;
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(Icons.folder, color: hoveredSidebarIndex == 1 ? colorScheme.primary : null),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => setState(() => hoveredSidebarIndex = 5),
+            onExit: (_) => setState(() => hoveredSidebarIndex = -1),
+            child: GestureDetector(
+              onTap: () async {
+                final changed = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MyPinsScreen()),
+                );
+                if (changed == true) {
+                  await loadPins();
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                padding: const EdgeInsets.all(6),
+                transform: Matrix4.identity()..scale(hoveredSidebarIndex == 5 ? 1.08 : 1.0),
+                decoration: BoxDecoration(
+                  color: hoveredSidebarIndex == 5 ? colorScheme.primary.withOpacity(0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.collections, color: hoveredSidebarIndex == 5 ? colorScheme.primary : null),
               ),
             ),
           ),
@@ -394,13 +422,15 @@ int hoveredIndex = -1;
                                        children: [
 
   
- Image.network(
-  pin['file_url']
-      .toString()
-      .replaceAll(
-        '127.0.0.1',
-        'localhost',
-      ),
+Image.network(
+  pin['file_url'].toString(),
+  errorBuilder: (context, error, stackTrace) {
+    debugPrint(error.toString());
+    return const Icon(
+      Icons.broken_image,
+      size: 80,
+    );
+  },
 )
         
 ,

@@ -24,6 +24,16 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
 
   final ApiService apiService = ApiService();
 
+  // Fallback categories shown when API returns none or is unreachable
+  final List<Map<String, Object>> defaultCategories = const [
+    {'id': 1, 'name': 'Food'},
+    {'id': 2, 'name': 'Anime'},
+    {'id': 3, 'name': 'Wallpaper'},
+    {'id': 4, 'name': 'Nature'},
+    {'id': 5, 'name': 'Art'},
+    {'id': 6, 'name': 'Photography'},
+  ];
+
   List categories = [];
   int? selectedCategory;
 
@@ -36,6 +46,8 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
   @override
   void initState() {
     super.initState();
+    // start with local defaults so user sees choices immediately
+    categories = List<Map<String, Object>>.from(defaultCategories);
     loadCategories();
   }
 
@@ -80,11 +92,23 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
   Future<void> loadCategories() async {
     try {
       final response = await apiService.getCategories();
+      final data = response.data != null && response.data['data'] != null ? response.data['data'] as List : [];
+      debugPrint('CATEGORIES FROM API:');
+      debugPrint(data.toString());
       setState(() {
-        categories = response.data['data'];
+        if (data.isNotEmpty) {
+          categories = data;
+        } else {
+          // keep local defaults if server returned empty
+          categories = List<Map<String, Object>>.from(defaultCategories);
+        }
       });
     } catch (e) {
       debugPrint(e.toString());
+      // fallback to defaults on error
+      setState(() {
+        categories = List<Map<String, Object>>.from(defaultCategories);
+      });
     }
   }
 
@@ -150,11 +174,11 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
           }
         }
       }
-debugPrint("========== CREATE PIN ==========");
-debugPrint("FILE URL: $fileUrl");
-debugPrint("CATEGORY: $selectedCategory");
-debugPrint("TITLE: ${titleController.text}");
-debugPrint("DESCRIPTION: ${descriptionController.text}");
+  debugPrint("========== CREATE PIN ==========");
+  debugPrint("CATEGORY ID = $selectedCategory");
+  debugPrint("TITLE = ${titleController.text}");
+  debugPrint("DESCRIPTION = ${descriptionController.text}");
+  debugPrint("FILE URL = $fileUrl");
       await apiService.createPin(
         categoryId: selectedCategory!,
         title: titleController.text,
@@ -264,17 +288,80 @@ debugPrint("DESCRIPTION: ${descriptionController.text}");
                   ),
                 ),
                 const SizedBox(height: 20),
-                DropdownButtonFormField<int>(
-                  initialValue: selectedCategory,
-                  decoration: InputDecoration(labelText: 'Category', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-                  items: categories.map((category) {
-                    return DropdownMenuItem<int>(value: category['id'], child: Text(category['name']));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedCategory = value;
-                    });
-                  },
+                // Category selector: tap to open modal list of categories
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(15),
+                        onTap: () async {
+                          if (categories.isEmpty) {
+                            await loadCategories();
+                          }
+                          if (categories.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No categories available')));
+                            return;
+                          }
+
+                          showModalBottomSheet<int>(
+                            context: context,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+                            builder: (ctx) {
+                              return SafeArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Text('Select Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                    ),
+                                    const Divider(height: 1),
+                                    Flexible(
+                                      child: ListView.builder(
+                                        shrinkWrap: true,
+                                        itemCount: categories.length,
+                                        itemBuilder: (context, i) {
+                                          final c = categories[i];
+                                          return ListTile(
+                                            title: Text(c['name'].toString()),
+                                            onTap: () {
+                                              setState(() {
+                                                selectedCategory = c['id'] as int;
+                                              });
+                                              Navigator.pop(ctx, selectedCategory);
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(labelText: 'Category', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                          child: Text(
+                            selectedCategory == null
+                                ? 'Tap to choose a category'
+                                : (categories.firstWhere((c) => c['id'] == selectedCategory, orElse: () => {'name': 'Unknown'})['name'].toString()),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Refresh categories',
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () async {
+                        await loadCategories();
+                        if (categories.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No categories available')));
+                        }
+                      },
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 25),
                 // Paid / Free toggle
