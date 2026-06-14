@@ -247,6 +247,10 @@ class PinController extends Controller
      */
     public function like(Request $request, $id)
     {
+\Log::info('LIKE HIT', [
+    'user_id' => $request->user()->id,
+    'pin_id' => $id,
+]);
         $user = $request->user();
         $pin = Pin::findOrFail($id);
 
