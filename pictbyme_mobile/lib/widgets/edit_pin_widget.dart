@@ -27,7 +27,12 @@ class _EditPinWidgetState extends State<EditPinWidget> {
     titleCtrl = TextEditingController(text: widget.pin['title']?.toString() ?? '');
     descCtrl = TextEditingController(text: widget.pin['description']?.toString() ?? '');
     priceCtrl = TextEditingController(text: (widget.pin['price_coin'] ?? '').toString());
-    catId = widget.pin['category_id'] as int? ?? (widget.pin['category']?['id'] as int?);
+   final rawCategory =
+    widget.pin['category_id'] ?? widget.pin['category']?['id'];
+
+catId = rawCategory is int
+    ? rawCategory
+    : int.tryParse(rawCategory?.toString() ?? '');
     // `is_premium` may be stored as int (0/1) or bool; convert safely
     final dynamic ip = widget.pin['is_premium'];
     if (ip is int) {
@@ -53,7 +58,11 @@ class _EditPinWidgetState extends State<EditPinWidget> {
     try {
       final resp = await apiService.updatePin(
         pinId: widget.pin['id'] as int,
-        categoryId: catId ?? (widget.pin['category']?['id'] as int? ?? 0),
+       categoryId: catId ??
+    int.tryParse(
+      widget.pin['category']?['id']?.toString() ?? '0',
+    ) ??
+    0,
         title: titleCtrl.text,
         description: descCtrl.text,
         priceCoin: price,
