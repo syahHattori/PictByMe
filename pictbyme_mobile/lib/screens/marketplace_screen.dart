@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'topup_screen.dart';
+import '../services/coin_controller.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../services/api_service.dart';
 import 'pin_detail_screen.dart';
@@ -16,11 +18,22 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   List paidPins = [];
   bool isLoading = true;
   int hoveredIndex = -1;
+  bool isCoinHovered = false;
+  int coinBalance = 0;
 
   @override
   void initState() {
     super.initState();
     _loadPaidPins();
+    _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final b = prefs.getInt('coin_balance') ?? 0;
+      if (mounted) setState(() => coinBalance = b);
+    } catch (_) {}
   }
 
   Future<void> _loadPaidPins() async {
@@ -73,6 +86,32 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       appBar: AppBar(
         title: const Text('Marketplace'),
         backgroundColor: cs.surface,
+        actions: [
+          const SizedBox(width: 8),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => setState(() => isCoinHovered = true),
+            onExit: (_) => setState(() => isCoinHovered = false),
+            child: GestureDetector(
+              onTap: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
+                _loadBalance();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOut,
+                transform: Matrix4.identity()..scale(isCoinHovered ? 1.03 : 1.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: isCoinHovered ? cs.primary.withOpacity(0.9) : cs.primary,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Text('🪙 $coinBalance', style: const TextStyle(color: Colors.white)),
+              ),
+            ),
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -153,31 +192,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                   child: Container(
                                     decoration: BoxDecoration(color: Colors.black45),
                                     child: Center(
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: cs.primary,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            ),
-                                            onPressed: () => _buyPin(pin),
-                                            icon: const Icon(Icons.shopping_cart),
-                                            label: const Text('Buy'),
+                                      child: Center(
+                                        child: ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: cs.primary,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                           ),
-
-                                          const SizedBox(width: 12),
-
-                                          OutlinedButton.icon(
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: Colors.white,
-                                              side: const BorderSide(color: Colors.white24),
-                                            ),
-                                            onPressed: () {},
-                                            icon: const Icon(Icons.bookmark_border),
-                                            label: const Text('Save'),
-                                          ),
-                                        ],
+                                          onPressed: () => _buyPin(pin),
+                                          icon: const Icon(Icons.shopping_cart),
+                                          label: const Text('Buy'),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -204,6 +228,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         final prefs = await SharedPreferences.getInstance();
         final balance = data['data']?['balance'] ?? prefs.getInt('coin_balance') ?? 0;
         await prefs.setInt('coin_balance', balance);
+        // update global coin controller so UI stays in sync
+        await CoinController().setBalance(balance);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? 'Purchase successful')));
           setState(() {});

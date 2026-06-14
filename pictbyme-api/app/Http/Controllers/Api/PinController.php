@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pin;
+use App\Models\Like;
+use App\Notifications\PinLiked;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Notification;
 
 class PinController extends Controller
 {
@@ -35,9 +38,20 @@ class PinController extends Controller
             'boards'
         ])->findOrFail($id);
 
+        // likes count and whether current user liked
+        $likesCount = \App\Models\Like::where('pin_id', $pin->id)->count();
+        $liked = false;
+        if (auth()->check()) {
+            $liked = \App\Models\Like::where('pin_id', $pin->id)->where('user_id', auth()->id())->exists();
+        }
+
+        $payload = $pin->toArray();
+        $payload['likes_count'] = $likesCount;
+        $payload['liked'] = $liked;
+
         return response()->json([
             'success' => true,
-            'data' => $pin
+            'data' => $payload
         ]);
     }
 
@@ -225,6 +239,60 @@ class PinController extends Controller
             return response()->json(['success' => true, 'message' => 'Pin deleted']);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => 'Delete failed', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Like a pin (create Like and notify owner).
+     */
+    public function like(Request $request, $id)
+    {
+        $user = $request->user();
+        $pin = Pin::findOrFail($id);
+
+        // prevent liking own pin
+        if ($pin->user_id === $user->id) {
+            return response()->json(['success' => false, 'message' => 'Cannot like your own pin'], 400);
+        }
+
+        try {
+            $like = Like::firstOrCreate([
+                'user_id' => $user->id,
+                'pin_id' => $pin->id,
+            ]);
+
+            // notify owner
+            try {
+                $owner = $pin->user;
+                if ($owner && $owner->id !== $user->id) {
+                    Notification::send($owner, new PinLiked($user, $pin));
+                }
+            } catch (\Throwable $nex) {
+                Log::warning('Failed to send PinLiked notification', ['error' => $nex->getMessage()]);
+            }
+
+            // return updated like count
+            $count = Like::where('pin_id', $pin->id)->count();
+
+            return response()->json(['success' => true, 'liked' => true, 'likes_count' => $count]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to like pin', ['exception' => $e]);
+            return response()->json(['success' => false, 'message' => 'Failed to like'], 500);
+        }
+    }
+
+    public function unlike(Request $request, $id)
+    {
+        $user = $request->user();
+        $pin = Pin::findOrFail($id);
+
+        try {
+            $deleted = Like::where('user_id', $user->id)->where('pin_id', $pin->id)->delete();
+            $count = Like::where('pin_id', $pin->id)->count();
+            return response()->json(['success' => true, 'liked' => false, 'likes_count' => $count]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to unlike pin', ['exception' => $e]);
+            return response()->json(['success' => false, 'message' => 'Failed to unlike'], 500);
         }
     }
 }

@@ -1,10 +1,20 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
 
 class ApiService {
- static const String baseUrl =
-    'http://127.0.0.1:8000/api';
+  // Dynamically choose host so Android emulator can reach localhost.
+  static String get baseUrl {
+    if (kIsWeb) return 'http://127.0.0.1:8000/api';
+    try {
+      if (Platform.isAndroid) return 'http://10.0.2.2:8000/api';
+    } catch (_) {}
+    return 'http://127.0.0.1:8000/api';
+  }
+
   final Dio dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
@@ -64,6 +74,29 @@ class ApiService {
     );
   }
 
+    Future<Response> changePassword({
+      required String currentPassword,
+      required String newPassword,
+      required String newPasswordConfirmation,
+    }) async {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      return await dio.post(
+        '/profile/password',
+        data: {
+          'current_password': currentPassword,
+          'password': newPassword,
+          'password_confirmation': newPasswordConfirmation,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+    }
+
   Future<Response> getMyPins() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -73,6 +106,31 @@ class ApiService {
 
     return await dio.get(
       '/pins/mine',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
+  Future<Response> updateProfile({
+    String? name,
+    String? username,
+    String? email,
+    String? profilePicture,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.put(
+      '/profile',
+      data: {
+        if (name != null) 'name': name,
+        if (username != null) 'username': username,
+        if (email != null) 'email': email,
+        if (profilePicture != null) 'profile_picture': profilePicture,
+      },
       options: Options(
         headers: {
           'Authorization': 'Bearer $token',
@@ -225,6 +283,39 @@ Future<Response> getBoardDetail(
     ),
   );
 }
+Future<Response> getPin(int pinId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.get(
+      '/pins/$pinId',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+}
+
+Future<Response> likePin({required int pinId}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.post(
+    '/pins/$pinId/like',
+    options: Options(headers: {'Authorization': 'Bearer $token'}),
+  );
+}
+
+Future<Response> unlikePin({required int pinId}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.delete(
+    '/pins/$pinId/like',
+    options: Options(headers: {'Authorization': 'Bearer $token'}),
+  );
+}
 Future<Response> topup({
   required int amount,
 }) async {
@@ -337,6 +428,20 @@ Future<Response> createBoard({
 Future<Response> getCategories() async {
   return await dio.get(
     '/categories',
+  );
+}
+
+Future<Response> getNotifications() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  return await dio.get(
+    '/notifications',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
   );
 }
 }

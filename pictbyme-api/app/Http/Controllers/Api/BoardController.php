@@ -10,7 +10,10 @@ class BoardController extends Controller
 {
     public function index(Request $request)
     {
-        $boards = Board::where(
+        // Include a small set of pins (cover tiles) for each board to render a mosaic on the client.
+        $boards = Board::with(['pins' => function($q) {
+            $q->latest()->take(4);
+        }])->where(
             'user_id',
             $request->user()->id
         )

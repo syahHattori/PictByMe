@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/coin_controller.dart';
 
 class TopupScreen extends StatefulWidget {
   const TopupScreen({super.key});
@@ -15,7 +16,6 @@ class _TopupScreenState extends State<TopupScreen> {
 
   String? qrImage;
   bool isLoading = false;
-  int balance = 0;
 
   @override
   void initState() {
@@ -35,6 +35,13 @@ class _TopupScreenState extends State<TopupScreen> {
         qrImage = response.data['onopay_response']['data']['qr_image'];
         isLoading = false;
       });
+      // If backend returned updated balance, update global CoinController
+      try {
+        final newBal = response.data['data']?['balance'] ?? response.data['balance'];
+        if (newBal != null && newBal is int) {
+          await CoinController().setBalance(newBal);
+        }
+      } catch (_) {}
     } catch (e) {
       debugPrint(e.toString());
       setState(() {
@@ -48,13 +55,11 @@ class _TopupScreenState extends State<TopupScreen> {
   Future<void> _loadBalance() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      setState(() {
-        balance = prefs.getInt('coin_balance') ?? 2500;
-      });
+      // Keep local load for legacy fallback; primary UI reads from CoinController
+      final b = prefs.getInt('coin_balance') ?? 2500;
+      await CoinController().setBalance(b);
     } catch (_) {
-      setState(() {
-        balance = 2500;
-      });
+      await CoinController().setBalance(2500);
     }
   }
 
@@ -80,7 +85,12 @@ class _TopupScreenState extends State<TopupScreen> {
                       children: [
                         Text('Balance', style: Theme.of(context).textTheme.bodySmall),
                         const SizedBox(height: 6),
-                        Text('$balance 🪙', style: Theme.of(context).textTheme.headlineSmall),
+                        ValueListenableBuilder<int>(
+                          valueListenable: CoinController().balance,
+                          builder: (context, val, _) {
+                            return Text('$val 🪙', style: Theme.of(context).textTheme.headlineSmall);
+                          },
+                        ),
                       ],
                     ),
                     ElevatedButton.icon(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../services/api_service.dart';
 import 'pin_detail_screen.dart';
+import '../widgets/edit_pin_widget.dart';
 
 class MyPinsScreen extends StatefulWidget {
   const MyPinsScreen({super.key});
@@ -33,183 +34,270 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
     } catch (_) {}
   }
 
-  Future<void> showEditDialog(Map pin) async {
-    final titleCtrl = TextEditingController(text: pin['title']?.toString() ?? '');
-    final descCtrl = TextEditingController(text: pin['description']?.toString() ?? '');
-    final priceCtrl = TextEditingController(text: (pin['price_coin'] ?? '').toString());
-    int? catId = pin['category_id'] as int? ?? (pin['category']?['id'] as int?);
-    bool isPremium = (pin['is_premium'] ?? false) as bool;
-
-    await showModalBottomSheet(
+  Future<bool> showEditDialog(Map pin) async {
+    final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Edit Pin', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Title')),
-                const SizedBox(height: 8),
-                TextField(controller: descCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Description')),
-                const SizedBox(height: 8),
-                TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price (coins)')),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<int>(
-                  value: catId,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: categories.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'] as int, child: Text(c['name'].toString()))).toList(),
-                  onChanged: (v) => catId = v,
-                ),
-                SwitchListTile.adaptive(value: isPremium, title: const Text('Sell this pin'), onChanged: (v) => isPremium = v),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final price = int.tryParse(priceCtrl.text) ?? 0;
-                          final resp = await apiService.updatePin(
-                            pinId: pin['id'] as int,
-                            categoryId: catId ?? (pin['category']?['id'] as int? ?? 0),
-                            title: titleCtrl.text,
-                            description: descCtrl.text,
-                            priceCoin: price,
-                            isPremium: isPremium,
-                          );
-                          if (resp.statusCode == 200) {
-                            _changed = true;
-                          }
-                          Navigator.pop(ctx);
-                        },
-                        child: const Text('Save')),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          child: EditPinWidget(pin: pin, categories: categories),
         );
       },
     );
+    return (result == true);
   }
 
   Future<void> loadMyPins() async {
-  setState(() => isLoading = true);
-
-  try {
-    final resp = await apiService.getMyPins();
-
-    print("STATUS = ${resp.statusCode}");
-    print("DATA = ${resp.data}");
-    debugPrint("===== MY PINS =====");
-    debugPrint(resp.data.toString());
-
-    setState(() {
-      pins = resp.data['data'];
-      isLoading = false;
-    });
-  } catch (e) {
-    debugPrint(e.toString());
-
-    setState(() {
-      isLoading = false;
-    });
+    setState(() => isLoading = true);
+    try {
+      final resp = await apiService.getMyPins();
+      setState(() {
+        pins = resp.data['data'] ?? [];
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint(e.toString());
+      setState(() => isLoading = false);
+    }
   }
-}
-  
+
+  void _showSnackBar(String msg, Color bgColor) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w500)),
+        backgroundColor: bgColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Future<void> _deletePinAction(Map pin) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Hapus Pin?', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Apakah kamu yakin ingin menghapus pin ini secara permanen dari galeri kamu?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal', style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            onPressed: () => Navigator.pop(ctx, true), 
+            child: const Text('Hapus')
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      try {
+        final delResp = await apiService.deletePin(pinId: pin['id'] as int);
+        if (delResp.statusCode == 200) {
+          _showSnackBar('Pin berhasil dihapus', Colors.green);
+          _changed = true;
+          await loadMyPins();
+        } else {
+          _showSnackBar('Gagal menghapus pin', Colors.redAccent);
+        }
+      } catch (_) {
+        _showSnackBar('Terjadi kesalahan koneksi', Colors.redAccent);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         Navigator.of(context).pop(_changed);
-        return false;
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: const Text('My Pins'),
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : pins.isEmpty
-              ? const Center(child: Text('You have not uploaded any pins yet'))
-              : LayoutBuilder(builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  final crossAxisCount = (width / 300).floor().clamp(2, 6);
-                  return MasonryGridView.count(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 15,
-                    crossAxisSpacing: 15,
-                    padding: const EdgeInsets.all(20),
-                    itemCount: pins.length,
-                    itemBuilder: (context, index) {
-                      final pin = pins[index];
-                          return MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: GestureDetector(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin))),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Stack(
-                                  children: [
-                                    Image.network(pin['file_url'].toString(), fit: BoxFit.cover, errorBuilder: (c, e, st) => const Icon(Icons.broken_image)),
-                                    Positioned(
-                                      top: 8,
-                                      right: 8,
-                                      child: Container(
-                                        decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(8)),
-                                        child: PopupMenuButton<int>(
-                                          color: Colors.grey[900],
-                                          icon: const Icon(Icons.more_vert, color: Colors.white),
-                                          onSelected: (value) async {
-                                            if (value == 1) {
-                                              // edit
-                                              await showEditDialog(pin);
-                                              await loadMyPins();
-                                            } else if (value == 2) {
-                                              final ok = await showDialog<bool>(
-                                                context: context,
-                                                builder: (ctx) => AlertDialog(
-                                                  title: const Text('Delete pin?'),
-                                                  content: const Text('This will permanently delete the pin.'),
-                                                  actions: [
-                                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                                    TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-                                                  ],
-                                                ),
-                                              );
-                                              if (ok == true) {
-                                                final delResp = await apiService.deletePin(pinId: pin['id'] as int);
-                                                if (delResp.statusCode == 200) {
-                                                  _changed = true;
-                                                }
-                                                await loadMyPins();
-                                              }
-                                            }
-                                          },
-                                          itemBuilder: (_) => [
-                                            const PopupMenuItem(value: 1, child: Text('Edit', style: TextStyle(color: Colors.white))),
-                                            const PopupMenuItem(value: 2, child: Text('Delete', style: TextStyle(color: Colors.white))),
+        backgroundColor: const Color(0xFFF8F9FA), // Latar belakang clean/soft grey
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          iconTheme: const IconThemeData(color: Colors.black87),
+          title: const Text(
+            'Koleksi Pin Saya',
+            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 18),
+          ),
+          centerTitle: true,
+        ),
+        body: isLoading
+            ? const Center(child: CircularProgressIndicator(color: Colors.black87))
+            : pins.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[300]),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Belum ada karya pin yang kamu unggah',
+                          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  )
+                : LayoutBuilder(builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    
+                    // Menentukan jumlah kolom secara dinamis berdasarkan lebar layar (2 kolom untuk mobile, lebih banyak untuk tablet/desktop)
+                    final crossAxisCount = (width / 180).floor().clamp(2, 5);
+
+                    return MasonryGridView.count(
+                      crossAxisCount: crossAxisCount,
+                      mainAxisSpacing: 10, // Jarak vertikal antar-pin super rapat ala Pinterest
+                      crossAxisSpacing: 10, // Jarak horizontal antar-pin
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      itemCount: pins.length,
+                      itemBuilder: (context, index) {
+                        final pin = pins[index];
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              )
+                            ],
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin))),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Stack(
+                                children: [
+                                  // --- KOMPONEN 1: UTAMA - GAMBAR MURNI (EDGE-TO-EDGE) ---
+                                  Image.network(
+                                    pin['file_url'].toString(),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, st) => Container(
+                                      height: 150,
+                                      color: Colors.grey[100],
+                                      child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.grey)),
+                                    ),
+                                  ),
+
+                                  // --- KOMPONEN 2: GRADIENT OVERLAY (Untuk Membaca Judul di Bagian Bawah) ---
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.black.withOpacity(0.0),
+                                            Colors.black.withOpacity(0.0),
+                                            Colors.black.withOpacity(0.1),
+                                            Colors.black.withOpacity(0.55),
                                           ],
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+
+                                  // --- KOMPONEN 3: FLOATING MENU TITIK 3 (Kanan Atas) ---
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      height: 32,
+                                      width: 32,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.85),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.1),
+                                            blurRadius: 4,
+                                          )
+                                        ],
+                                      ),
+                                      child: Theme(
+                                        data: Theme.of(context).copyWith(
+                                          hoverColor: Colors.transparent,
+                                          splashColor: Colors.transparent,
+                                        ),
+                                        child: PopupMenuButton<int>(
+                                          padding: EdgeInsets.zero,
+                                          icon: const Icon(Icons.more_horiz_rounded, color: Colors.black87, size: 18),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                          onSelected: (choice) async {
+                                            if (choice == 1) {
+                                              final updated = await showEditDialog(pin);
+                                              if (updated) {
+                                                _showSnackBar('Pin berhasil diperbarui', Colors.green);
+                                                await loadMyPins();
+                                              }
+                                            } else if (choice == 2) {
+                                              await _deletePinAction(pin);
+                                            }
+                                          },
+                                          itemBuilder: (_) => const [
+                                            PopupMenuItem(
+                                              value: 1, 
+                                              child: ListTile(
+                                                dense: true,
+                                                leading: Icon(Icons.edit_rounded, color: Colors.blueAccent, size: 20), 
+                                                title: Text('Edit Pin', style: TextStyle(fontWeight: FontWeight.w600))
+                                              )
+                                            ),
+                                            PopupMenuItem(
+                                              value: 2, 
+                                              child: ListTile(
+                                                dense: true,
+                                                leading: Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20), 
+                                                title: Text('Hapus', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.redAccent))
+                                              )
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // --- KOMPONEN 4: TEKS JUDUL MENGAMBANG (Kiri Bawah) ---
+                                  Positioned(
+                                    left: 10,
+                                    right: 10,
+                                    bottom: 10,
+                                    child: Text(
+                                      pin['title'] ?? 'Tanpa Judul',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                        shadows: [
+                                          Shadow(
+                                            offset: Offset(0, 1),
+                                            blurRadius: 4,
+                                            color: Colors.black38,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          );
-                    },
-                  );
-                }),
+                          ),
+                        );
+                      },
+                    );
+                  }),
       ),
     );
   }

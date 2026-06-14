@@ -1,11 +1,31 @@
 import 'package:flutter/material.dart';
 import 'screens/landing_screen.dart';
 import 'services/theme_controller.dart';
+import 'services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'services/api_service.dart';
+import 'services/coin_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeController.init();
-  runApp(const PictByMeApp());
+    // Try to initialize realtime notifications if user already logged in
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      await CoinController().init();
+      if (token != null && token.isNotEmpty) {
+        final api = ApiService();
+        final resp = await api.getProfile();
+        if (resp.statusCode == 200 && resp.data != null) {
+          final user = resp.data['data'];
+          final userId = user['id'];
+          await NotificationService().init(userId: userId);
+        }
+      }
+    } catch (_) {}
+
+    runApp(const PictByMeApp());
 }
 
 class PictByMeApp extends StatelessWidget {
@@ -88,6 +108,8 @@ class PictByMeApp extends StatelessWidget {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'PictByMe',
+          // navigatorKey may be used by notification service in future
+          navigatorKey: GlobalKey<NavigatorState>(),
           builder: (context, child) => AnimatedTheme(
             data: isDarkMode ? darkTheme : lightTheme,
             duration: const Duration(milliseconds: 300),
