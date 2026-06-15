@@ -40,21 +40,33 @@ class _BoardsScreenState extends State<BoardsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFFAFAFA), 
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         scrolledUnderElevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
-        title: const Text(
-          'Album & Koleksi Saya',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 18),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.folder_copy_rounded, color: Colors.black87, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Album & Koleksi Saya',
+              style: TextStyle(
+                color: Colors.black87, 
+                fontWeight: FontWeight.w900, 
+                fontSize: 19,
+                letterSpacing: -0.5
+              ),
+            ),
+          ],
         ),
         centerTitle: true,
         actions: [
           IconButton(
             onPressed: _showCreateBoardDialog,
-            icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.black87),
+            icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.black87, size: 26),
             tooltip: 'Buat Album Baru',
           ),
         ],
@@ -63,21 +75,33 @@ class _BoardsScreenState extends State<BoardsScreen> {
         onRefresh: loadBoards,
         color: Colors.black87,
         child: isLoading
-            ? const Center(child: CircularProgressIndicator(color: Colors.black87))
+            ? const Center(child: CircularProgressIndicator(color: Colors.black87, strokeWidth: 3))
             : boards.isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.25),
                       Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.folder_open_rounded, size: 64, color: Colors.grey[300]),
-                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF1F3F5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.folder_open_rounded, size: 64, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 16),
                             const Text(
-                              'Belum ada album yang dibuat',
-                              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 14),
+                              'Belum ada album yang dibuat 📁',
+                              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Ketuk ikon + di kanan atas untuk membuat koleksi baru.',
+                              style: TextStyle(color: Colors.grey, fontSize: 13),
                             ),
                           ],
                         ),
@@ -89,32 +113,36 @@ class _BoardsScreenState extends State<BoardsScreen> {
                     final crossAxisCount = (width / 240).floor().clamp(2, 5);
 
                     return GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       physics: const AlwaysScrollableScrollPhysics(),
                       itemCount: boards.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
-                        mainAxisSpacing: 20,
+                        mainAxisSpacing: 22,
                         crossAxisSpacing: 16,
-                        childAspectRatio: 0.82, 
+                        childAspectRatio: 0.80, 
                       ),
                       itemBuilder: (context, index) {
                         final board = boards[index];
                         final List innerPins = board['pins'] ?? []; 
 
-                        // 🔥 AMBIL TOTAL PIN ASLI DARI BACKEND COUNTER
-                        // Mendukung key 'pins_count' atau 'total_pins'. Jika null, baru pakai panjang array.
-                        final int totalPins = board['pins_count'] ?? board['total_pins'] ?? innerPins.length;
+                        // 🔥 Fallback counter serbaguna dari backend agar kalkulasi jumlah tidak mentok di 4
+                        final int totalPins = board['pins_count'] ?? 
+                                              board['total_pins'] ?? 
+                                              board['pins_total'] ?? 
+                                              board['count'] ?? 
+                                              innerPins.length;
 
                         return GestureDetector(
                           onTap: () async {
                             try {
                               final resp = await apiService.getBoardDetail(board['id']);
-                              if (!context.mounted) return;
+                              
+                              // 🔥 FIX: Pengecekan 'mounted' untuk menghindari async gaps warning
+                              if (!mounted) return;
                               
                               if (resp.statusCode == 200 && resp.data != null) {
                                 final b = resp.data['data'];
-                                // 🔥 Ditambahkan `await` agar mendengarkan ketika user kembali dari halaman detail
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => BoardDetailScreen(board: b)),
@@ -126,14 +154,14 @@ class _BoardsScreenState extends State<BoardsScreen> {
                                 );
                               }
                             } catch (e) {
+                              if (!mounted) return;
                               await Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (_) => BoardDetailScreen(board: board)),
                               );
                             }
                             
-                            // 🔥 REFRESH DATA setelah kembali dari halaman detail (siapa tahu ada foto didelete di dalam)
-                            loadBoards();
+                            if (mounted) loadBoards();
                           },
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,24 +170,25 @@ class _BoardsScreenState extends State<BoardsScreen> {
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
+                                    borderRadius: BorderRadius.circular(24), 
+                                    boxShadow: const [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.03),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
+                                        color: Color(0x08000000), 
+                                        blurRadius: 12,
+                                        offset: Offset(0, 4),
                                       )
                                     ],
+                                    border: Border.all(color: const Color(0x0F000000)),
                                   ),
                                   child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: _buildGalleryCollage(innerPins),
+                                    borderRadius: BorderRadius.circular(23),
+                                    child: _buildGalleryCollage(innerPins, totalPins),
                                   ),
                                 ),
                               ),
                               
                               Padding(
-                                padding: const EdgeInsets.only(top: 10, left: 6, right: 6),
+                                padding: const EdgeInsets.only(top: 10, left: 8, right: 8),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -168,20 +197,18 @@ class _BoardsScreenState extends State<BoardsScreen> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: FontWeight.w800,
                                         fontSize: 14,
                                         color: Colors.black87,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    
-                                    // 🔥 UPDATE: Menampilkan total pins yang akurat
+                                    const SizedBox(height: 3),
                                     Text(
                                       '$totalPins Foto Simpanan',
-                                      style: TextStyle(
-                                        color: Colors.grey[500],
+                                      style: const TextStyle(
+                                        color: Colors.black54,
                                         fontSize: 12,
-                                        fontWeight: FontWeight.w500,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],
@@ -205,8 +232,8 @@ class _BoardsScreenState extends State<BoardsScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Buat Album Baru', style: TextStyle(fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Buat Album Baru 📂', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         content: Container(
           constraints: const BoxConstraints(maxWidth: 400),
           child: Form(
@@ -215,21 +242,26 @@ class _BoardsScreenState extends State<BoardsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: titleCtrl,
                     decoration: InputDecoration(
                       labelText: 'Judul Album',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      hintText: 'Misal: Inspirasi OOTD, Wisata',
+                      labelStyle: const TextStyle(color: Colors.black54),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.black87)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Judul album wajib diisi' : null,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   TextFormField(
                     controller: descCtrl,
                     decoration: InputDecoration(
                       labelText: 'Deskripsi (opsional)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      labelStyle: const TextStyle(color: Colors.black54),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.black87)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
                 ],
@@ -240,13 +272,14 @@ class _BoardsScreenState extends State<BoardsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false), 
-            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+            child: const Text('Batal', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               backgroundColor: Colors.black87,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
             onPressed: () async {
               if (formKey.currentState == null) return;
@@ -265,7 +298,7 @@ class _BoardsScreenState extends State<BoardsScreen> {
                 Navigator.pop(c, false);
               }
             },
-            child: const Text('Buat'),
+            child: const Text('Buat Album'),
           ),
         ],
       ),
@@ -276,12 +309,13 @@ class _BoardsScreenState extends State<BoardsScreen> {
     }
   }
 
-  Widget _buildGalleryCollage(List pins) {
+  // 🔥 FIX: Keyword 'const' dilepas dari text bergaya dinamis agar terbebas dari eror 'Invalid constant value'
+  Widget _buildGalleryCollage(List pins, int totalPins) {
     if (pins.isEmpty) {
       return Container(
-        color: const Color(0xFFE9ECEF),
-        child: Center(
-          child: Icon(Icons.photo_library_rounded, size: 36, color: Colors.grey[400]),
+        color: const Color(0xFFF1F3F5),
+        child: const Center(
+          child: Icon(Icons.photo_library_rounded, size: 36, color: Colors.black26),
         ),
       );
     }
@@ -294,11 +328,13 @@ class _BoardsScreenState extends State<BoardsScreen> {
       return Row(
         children: [
           Expanded(child: _buildTileImage(_extractFileUrl(pins[0]))),
-          const SizedBox(width: 2),
+          const SizedBox(width: 3),
           Expanded(child: _buildTileImage(_extractFileUrl(pins[1]))),
         ],
       );
     }
+
+    final int remainingCount = totalPins - 2;
 
     return Row(
       children: [
@@ -306,14 +342,34 @@ class _BoardsScreenState extends State<BoardsScreen> {
           flex: 2,
           child: _buildTileImage(_extractFileUrl(pins[0])),
         ),
-        const SizedBox(width: 3),
+        const SizedBox(width: 4),
         Expanded(
           flex: 1,
           child: Column(
             children: [
               Expanded(child: _buildTileImage(_extractFileUrl(pins[1]))),
-              const SizedBox(height: 3),
-              Expanded(child: _buildTileImage(_extractFileUrl(pins[2]))),
+              const SizedBox(height: 4),
+              Expanded(
+                child: Stack(
+                  children: [
+                    _buildTileImage(_extractFileUrl(pins[2])),
+                    if (remainingCount > 1)
+                      Container(
+                        color: const Color(0x66000000), 
+                        child: Center(
+                          child: Text(
+                            '+$remainingCount',
+                            style: const TextStyle( 
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900, // 🔥 FIX: Menggunakan FontWeight.w900 agar valid
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

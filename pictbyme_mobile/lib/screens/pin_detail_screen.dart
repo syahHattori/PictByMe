@@ -19,7 +19,11 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
   late Map pinData;
   bool loading = true;
   bool isDownloading = false; 
+  bool isSubmittingComment = false; // 🔥 Status loading saat kirim komentar
   StreamSubscription? _pinUpdateSub;
+
+  // 🔥 Controller untuk menangkap teks di kolom komentar
+  final TextEditingController _commentController = TextEditingController();
 
   @override
   void initState() {
@@ -40,6 +44,7 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
   @override
   void dispose() {
     _pinUpdateSub?.cancel();
+    _commentController.dispose(); // 🔥 Hapus controller dari memori saat screen ditutup
     super.dispose();
   }
 
@@ -58,14 +63,65 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
     setState(() => loading = false);
   }
 
-  // 🔥 FUNGSI YANG SUDAH DIPERBAIKI (MEMANGGIL DOWNLOAD SERVICE)
+  // 🔥 FUNGSI UNTUK MENGIRIM KOMENTAR BARU
+  Future<void> _submitComment() async {
+    final String text = _commentController.text.trim();
+    if (text.isEmpty) return; // Jangan kirim jika kosong
+
+    setState(() => isSubmittingComment = true);
+
+    try {
+      // 1. Panggil fungsi addComment di ApiService kamu
+      // Pastikan di backend/api_service.dart kamu sudah membuat fungsi ini ya!
+      await apiService.addComment(pinId: pinData['id'] as int, content: text);
+      
+      _commentController.clear(); // Bersihkan kolom ketik
+      await _refresh(); // Ambil data terbaru agar komentar langsung muncul
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Komentar berhasil dikirim! ✨'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      // 💡 Cadangan Sistem Lokal (Buat Testing): 
+      // Jika API backend-mu belum siap, kita suntik data lokal dulu agar kamu bisa lihat hasilnya langsung
+      if (!mounted) return;
+      setState(() {
+        if (pinData['comments'] == null) {
+          pinData['comments'] = [];
+        }
+        (pinData['comments'] as List).insert(0, {
+          'id': DateTime.now().millisecondsSinceEpoch,
+          'content': text,
+          'created_at': 'Baru saja',
+          'user': {
+            'username': 'Anda',
+            'profile_picture': null,
+          }
+        });
+      });
+      _commentController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Komentar ditambahkan (Mode Simulasi Lokal)'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => isSubmittingComment = false);
+    }
+  }
+
   Future<void> _downloadImageToInternalStorage(String imageUrl) async {
     if (imageUrl.isEmpty) return;
-    
     setState(() => isDownloading = true);
     
     try {
-      // Memanggil fungsi download terpusat dari DownloadService
       await DownloadService.downloadImage(
         imageUrl, 
         title: pinData['title']?.toString(),
@@ -76,7 +132,7 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
         SnackBar(
           content: Text(
             kIsWeb 
-                ? 'Gambar berhasil diunduh ke Laptop! 💻' 
+                ? 'Gambar berhasil diunduh! 💻' 
                 : 'Gambar berhasil disimpan ke Galeri HP! 💾', 
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
@@ -336,26 +392,135 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                       const SizedBox(height: 24),
                       const Divider(height: 1, color: Color(0xFFEFEFEF)),
                       const SizedBox(height: 20),
+                      
+                      // --- 💬 BAGIAN KOMENTAR (DIUBAH MENJADI INTERAKTIF) ---
                       const Text('Comments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
                       const SizedBox(height: 12),
+                      
+                      // 1. INPUT TEXT FIELD UNTUK MENULIS KOMENTAR
                       Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.black.withOpacity(0.03)),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 8, offset: const Offset(0, 2))
+                          ]
                         ),
-                        child: Column(
+                        child: Row(
                           children: [
-                            Icon(Icons.chat_bubble_outline_rounded, size: 36, color: Colors.grey[300]),
-                            const SizedBox(height: 10),
-                            Text('Belum ada komentar', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14)),
-                            const SizedBox(height: 4),
-                            Text('Jadilah yang pertama memberikan tanggapan!', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                            Expanded(
+                              child: TextField(
+                                controller: _commentController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Tambahkan komentar publik...',
+                                  hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                                ),
+                                maxLines: null,
+                              ),
+                            ),
+                            isSubmittingComment
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blueAccent),
+                                  )
+                                : IconButton(
+                                    icon: const Icon(Icons.send_rounded, color: Colors.blueAccent),
+                                    onPressed: _submitComment,
+                                  ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
+
+                      // 2. DAFTAR LIST KOMENTAR DARI API
+                      (() {
+                        final List comments = pinData['comments'] ?? [];
+                        if (comments.isEmpty) {
+                          return Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.black.withOpacity(0.03)),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(Icons.chat_bubble_outline_rounded, size: 36, color: Colors.grey[300]),
+                                const SizedBox(height: 10),
+                                Text('Belum ada komentar', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14)),
+                                const SizedBox(height: 4),
+                                Text('Jadilah yang pertama memberikan tanggapan!', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(), // Memakai scroll utama screen
+                          itemCount: comments.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final item = comments[index];
+                            final commenter = item['user'] ?? {};
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.black.withOpacity(0.015)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: Colors.grey[200],
+                                    backgroundImage: commenter['profile_picture'] != null
+                                        ? NetworkImage(commenter['profile_picture'].toString()) as ImageProvider
+                                        : null,
+                                    child: commenter['profile_picture'] == null
+                                        ? const Icon(Icons.person, size: 16, color: Colors.grey)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              commenter['username'] ?? 'Anonymous',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                                            ),
+                                            Text(
+                                              item['created_at'] ?? '',
+                                              style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          item['content'] ?? '',
+                                          style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      }()),
                     ],
                   );
 

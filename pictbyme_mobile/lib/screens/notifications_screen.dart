@@ -22,7 +22,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.initState();
     _load();
     
-    // Berlangganan ke realtime incoming notifications stream
     try {
       _sub = NotificationService().stream.listen((payload) {
         if (!mounted) return;
@@ -51,9 +50,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
+        content: Row(
+          children: [
+            const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white))),
+          ],
+        ),
+        backgroundColor: const Color(0xFF212121), // 🔥 FIX: Mengganti Colors.blackEE yang tidak valid
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -76,18 +82,68 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  Map<String, dynamic> _getNotificationStyle(String? iconType, String message) {
+    final msgLower = message.toLowerCase();
+    
+    if (iconType == 'favorite' || msgLower.contains('suka') || msgLower.contains('like')) {
+      return {
+        'icon': Icons.favorite_rounded,
+        'iconColor': Colors.pink.shade400,
+        'bgColor': Colors.pink.shade50,
+        'badgeColor': Colors.pink.shade400,
+        'gradient': LinearGradient(colors: [Colors.pink.shade50, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      };
+    } else if (iconType == 'monetization_on' || msgLower.contains('beli') || msgLower.contains('purchase') || msgLower.contains('koin')) {
+      return {
+        'icon': Icons.monetization_on_rounded,
+        'iconColor': Colors.amber.shade800,
+        'bgColor': Colors.amber.shade50,
+        'badgeColor': Colors.amber.shade600,
+        'gradient': LinearGradient(colors: [Colors.amber.shade50, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      };
+    } else if (msgLower.contains('komentar') || msgLower.contains('comment') || msgLower.contains('membalas')) {
+      return {
+        'icon': Icons.chat_bubble_rounded,
+        'iconColor': Colors.purple.shade400,
+        'bgColor': Colors.purple.shade50,
+        'badgeColor': Colors.purple.shade400,
+        'gradient': LinearGradient(colors: [Colors.purple.shade50, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      };
+    } else {
+      return {
+        'icon': Icons.star_rounded,
+        'iconColor': Colors.blueAccent,
+        'bgColor': Colors.blue.shade50,
+        'badgeColor': Colors.blueAccent,
+        'gradient': LinearGradient(colors: [Colors.blue.shade50, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      };
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFFAFAFA), 
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
-        title: const Text(
-          'Notifikasi',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 18),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.auto_awesome, color: Colors.amber, size: 20), // 🔥 FIX: Mengganti Icons.sparkles ke Icons.auto_awesome
+            SizedBox(width: 8),
+            Text(
+              'Notifikasi',
+              style: TextStyle(
+                color: Colors.black87, 
+                fontWeight: FontWeight.w900, // 🔥 FIX: Mengganti FontWeight.black ke FontWeight.w900
+                fontSize: 19, 
+                letterSpacing: -0.5
+              ),
+            ),
+          ],
         ),
         centerTitle: true,
       ),
@@ -98,11 +154,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.notifications_none_rounded, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.notifications_off_rounded, size: 72, color: Colors.grey[400]),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Kotak Masukmu Sepi Nih.. 🕊️',
+                        style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 6),
                       Text(
-                        'Belum ada notifikasi baru',
-                        style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w600, fontSize: 14),
+                        'Belum ada interaksi atau notifikasi baru saat ini.',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 13),
                       ),
                     ],
                   ),
@@ -114,7 +182,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       color: Colors.black87,
                       onRefresh: _load,
                       child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         physics: const AlwaysScrollableScrollPhysics(),
                         itemCount: items.length,
                         itemBuilder: (context, index) {
@@ -123,104 +191,131 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           final from = data['from_user'] ?? {};
                           final pin = data['pin'] ?? {};
                           
-                          final pinId = pin['id'] ?? data['pin_id']; // Fallback jika pakai data lama
+                          final pinId = pin['id'] ?? data['pin_id'];
                           final message = data['message'] ?? '';
                           final username = from['username'] ?? 'Seseorang';
                           final pinImageUrl = pin['image_url'];
                           final hasProfile = from['profile_picture'] != null && from['profile_picture'].toString().isNotEmpty;
 
-                          // Konfigurasi Badge Ikon Dinamis ala IG berdasarkan payload Laravel
-                          IconData iconData = Icons.notifications_rounded;
-                          Color iconColor = Colors.grey;
-                          if (data['icon'] == 'favorite') {
-                            iconData = Icons.favorite_rounded;
-                            iconColor = Colors.red;
-                          } else if (data['icon'] == 'monetization_on') {
-                            iconData = Icons.monetization_on_rounded;
-                            iconColor = Colors.amber.shade700;
-                          }
+                          final style = _getNotificationStyle(data['icon']?.toString(), message);
 
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
+                            margin: const EdgeInsets.only(bottom: 10),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.black.withOpacity(0.02)),
+                              gradient: style['gradient'], 
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (style['iconColor'] as Color).withOpacity(0.06),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                              border: Border.all(color: (style['iconColor'] as Color).withOpacity(0.12), width: 1),
                             ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                              
-                              // 1. FOTO PROFIL DENGAN BADGE IKON DI POJOK (Gaya IG)
-                              leading: Stack(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: Colors.blueAccent.withOpacity(0.1),
-                                    backgroundImage: hasProfile ? NetworkImage(from['profile_picture'].toString()) : null,
-                                    child: !hasProfile ? const Icon(Icons.person_rounded, color: Colors.blueAccent) : null,
-                                  ),
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(2),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(iconData, color: iconColor, size: 11),
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              // 2. TEXT STYLE INSTAGRAM (Username dicetak Tebal)
-                              title: RichText(
-                                text: TextSpan(
-                                  style: const TextStyle(color: Colors.black87, fontSize: 13.5, height: 1.3),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                leading: Stack(
+                                  clipBehavior: Clip.none,
                                   children: [
-                                    TextSpan(
-                                      text: '$username ',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 2),
+                                        boxShadow: [
+                                          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6)
+                                        ],
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: 24,
+                                        backgroundColor: style['bgColor'],
+                                        backgroundImage: hasProfile ? NetworkImage(from['profile_picture'].toString()) : null,
+                                        child: !hasProfile ? Icon(Icons.person_rounded, color: style['iconColor'], size: 24) : null,
+                                      ),
                                     ),
-                                    TextSpan(
-                                      text: message,
-                                      style: const TextStyle(fontWeight: FontWeight.w500),
-                                    ),
-                                    TextSpan(
-                                      text: '  ${_timeAgo(n['created_at']?.toString() ?? '')}',
-                                      style: TextStyle(color: Colors.grey[400], fontSize: 11, fontWeight: FontWeight.bold),
+                                    Positioned(
+                                      bottom: -2,
+                                      right: -2,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: style['badgeColor'],
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                          boxShadow: [
+                                            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4)
+                                          ]
+                                        ),
+                                        child: Icon(style['icon'], color: Colors.white, size: 11),
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-
-                              // 3. THUMBNAIL PREVIEW PIN DI SEBELAH KANAN (Gaya IG)
-                              trailing: pinImageUrl != null && pinImageUrl.toString().isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        pinImageUrl.toString(),
-                                        width: 44,
-                                        height: 44,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Container(
-                                          width: 44,
-                                          height: 44,
-                                          color: Colors.grey[100],
-                                          child: const Icon(Icons.broken_image_outlined, size: 18, color: Colors.grey),
-                                        ),
+                                title: RichText(
+                                  text: TextSpan(
+                                    style: const TextStyle(color: Colors.black87, fontSize: 13.5, height: 1.4),
+                                    children: [
+                                      TextSpan(
+                                        text: '$username ',
+                                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black), // 🔥 FIX: FontWeight.black ke FontWeight.w900
                                       ),
-                                    )
-                                  : null,
-                              onTap: () {
-                                if (pinId != null) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => PinDetailScreen(pin: {'id': pinId})),
-                                  );
-                                }
-                              },
+                                      TextSpan(
+                                        text: message,
+                                        style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF495057)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade400),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _timeAgo(n['created_at']?.toString() ?? ''),
+                                        style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w700),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                trailing: pinImageUrl != null && pinImageUrl.toString().isNotEmpty
+                                    ? Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.white, width: 2),
+                                          boxShadow: [
+                                            BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2))
+                                          ],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Image.network(
+                                            pinImageUrl.toString(),
+                                            width: 46,
+                                            height: 46,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => Container(
+                                              width: 46,
+                                              height: 46,
+                                              color: Colors.grey[100],
+                                              child: const Icon(Icons.broken_image_outlined, size: 18, color: Colors.grey),
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey.shade300),
+                                onTap: () {
+                                  if (pinId != null) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => PinDetailScreen(pin: {'id': pinId})),
+                                    );
+                                  }
+                                },
+                              ),
                             ),
                           );
                         },
@@ -238,9 +333,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final diff = DateTime.now().difference(dt);
       
       if (diff.inSeconds < 60) return 'Baru saja';
-      if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-      if (diff.inHours < 24) return '${diff.inHours}j';
-      return '${diff.inDays}d';
+      if (diff.inMinutes < 60) return '${diff.inMinutes} menit yang lalu';
+      if (diff.inHours < 24) return '${diff.inHours} jam yang lalu';
+      return '${diff.inDays} hari yang lalu';
     } catch (_) {
       return '';
     }
