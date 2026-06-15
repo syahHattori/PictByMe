@@ -315,7 +315,21 @@ class ApiService {
       ),
     );
   }
+Future<Response> deleteComment({
+  required int commentId,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
 
+  return await dio.delete(
+    '/admin/comments/$commentId',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+}
   Future<Response> topup({
     required int amount,
   }) async {

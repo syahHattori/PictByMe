@@ -126,19 +126,20 @@ class _BoardsScreenState extends State<BoardsScreen> {
                         final board = boards[index];
                         final List innerPins = board['pins'] ?? []; 
 
-                        // 🔥 Fallback counter serbaguna dari backend agar kalkulasi jumlah tidak mentok di 4
-                        final int totalPins = board['pins_count'] ?? 
-                                              board['total_pins'] ?? 
-                                              board['pins_total'] ?? 
-                                              board['count'] ?? 
-                                              innerPins.length;
+                        // 🔥 FIX: Perbaikan parsing agar aman dari error type "String is not a subtype of int"
+                        final rawCount = board['pins_count'] ?? 
+                                         board['total_pins'] ?? 
+                                         board['pins_total'] ?? 
+                                         board['count'] ?? 
+                                         innerPins.length;
+                        
+                        final int totalPins = int.tryParse(rawCount.toString()) ?? innerPins.length;
 
                         return GestureDetector(
                           onTap: () async {
                             try {
                               final resp = await apiService.getBoardDetail(board['id']);
                               
-                              // 🔥 FIX: Pengecekan 'mounted' untuk menghindari async gaps warning
                               if (!mounted) return;
                               
                               if (resp.statusCode == 200 && resp.data != null) {
@@ -309,7 +310,6 @@ class _BoardsScreenState extends State<BoardsScreen> {
     }
   }
 
-  // 🔥 FIX: Keyword 'const' dilepas dari text bergaya dinamis agar terbebas dari eror 'Invalid constant value'
   Widget _buildGalleryCollage(List pins, int totalPins) {
     if (pins.isEmpty) {
       return Container(
@@ -361,7 +361,7 @@ class _BoardsScreenState extends State<BoardsScreen> {
                             '+$remainingCount',
                             style: const TextStyle( 
                               color: Colors.white,
-                              fontWeight: FontWeight.w900, // 🔥 FIX: Menggunakan FontWeight.w900 agar valid
+                              fontWeight: FontWeight.w900, 
                               fontSize: 15,
                             ),
                           ),

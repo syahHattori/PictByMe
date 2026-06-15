@@ -19,18 +19,20 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
   late Map pinData;
   bool loading = true;
   bool isDownloading = false; 
-  bool isSubmittingComment = false; // 🔥 Status loading saat kirim komentar
+  bool isSubmittingComment = false;
+  bool isAdmin = false; 
   StreamSubscription? _pinUpdateSub;
 
-  // 🔥 Controller untuk menangkap teks di kolom komentar
   final TextEditingController _commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     pinData = widget.pin;
-    _refresh();
     
+    _refresh();
+    _loadUserRole(); 
+
     _pinUpdateSub = PinUpdateBus.instance.stream.listen((updated) {
       try {
         if (updated['id'] == pinData['id']) {
@@ -44,8 +46,29 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
   @override
   void dispose() {
     _pinUpdateSub?.cancel();
-    _commentController.dispose(); // 🔥 Hapus controller dari memori saat screen ditutup
+    _commentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUserRole() async {
+    try {
+      final resp = await apiService.getProfile();
+      print("PROFILE = ${resp.data}");
+
+      if (resp.statusCode == 200) {
+        final user = resp.data['user'];
+        print("ROLE = ${user['role']}");
+
+        if (mounted) {
+          setState(() {
+            isAdmin = user['role'] == 'admin';
+          });
+        }
+        print("IS ADMIN = $isAdmin");
+      }
+    } catch (e) {
+      print("PROFILE ERROR = $e");
+    }
   }
 
   Future<void> _refresh() async {
@@ -63,20 +86,16 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
     setState(() => loading = false);
   }
 
-  // 🔥 FUNGSI UNTUK MENGIRIM KOMENTAR BARU
   Future<void> _submitComment() async {
     final String text = _commentController.text.trim();
-    if (text.isEmpty) return; // Jangan kirim jika kosong
+    if (text.isEmpty) return; 
 
     setState(() => isSubmittingComment = true);
 
     try {
-      // 1. Panggil fungsi addComment di ApiService kamu
-      // Pastikan di backend/api_service.dart kamu sudah membuat fungsi ini ya!
       await apiService.addComment(pinId: pinData['id'] as int, content: text);
-      
-      _commentController.clear(); // Bersihkan kolom ketik
-      await _refresh(); // Ambil data terbaru agar komentar langsung muncul
+      _commentController.clear(); 
+      await _refresh(); 
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,8 +106,6 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
         ),
       );
     } catch (e) {
-      // 💡 Cadangan Sistem Lokal (Buat Testing): 
-      // Jika API backend-mu belum siap, kita suntik data lokal dulu agar kamu bisa lihat hasilnya langsung
       if (!mounted) return;
       setState(() {
         if (pinData['comments'] == null) {
@@ -96,7 +113,7 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
         }
         (pinData['comments'] as List).insert(0, {
           'id': DateTime.now().millisecondsSinceEpoch,
-          'content': text,
+          'comment': text, 
           'created_at': 'Baru saja',
           'user': {
             'username': 'Anda',
@@ -112,8 +129,68 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
-    } finally {
+    } finally { // <-- PERBAIKAN: Di sini sekarang sudah beralih menggunakan 'finally' dengan benar
       if (mounted) setState(() => isSubmittingComment = false);
+    }
+  }
+
+  Future<void> _handleDeleteComment(int commentId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+            SizedBox(width: 8),
+            Text('Hapus Komentar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'Apakah Anda yakin ingin menghapus komentar ini? Tindakan ini tidak dapat dibatalkan.',
+          style: TextStyle(fontSize: 14, color: Color(0xFF334155)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await apiService.deleteComment(commentId: commentId);
+      await _refresh();
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Komentar berhasil dihapus 🗑️', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal menghapus komentar', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -393,19 +470,38 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                       const Divider(height: 1, color: Color(0xFFEFEFEF)),
                       const SizedBox(height: 20),
                       
-                      // --- 💬 BAGIAN KOMENTAR (DIUBAH MENJADI INTERAKTIF) ---
-                      const Text('Comments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
-                      const SizedBox(height: 12),
+                      // --- 💬 BAGIAN UTAMA KOMENTAR ---
+                      Row(
+                        children: [
+                          const Text(
+                            'Comments', 
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${(pinData['comments'] as List?)?.length ?? 0}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       
-                      // 1. INPUT TEXT FIELD UNTUK MENULIS KOMENTAR
+                      // INPUT FIELD KOMENTAR
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(28),
-                          border: Border.all(color: Colors.grey.shade200),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 8, offset: const Offset(0, 2))
+                            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
                           ]
                         ),
                         child: Row(
@@ -414,45 +510,52 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                               child: TextField(
                                 controller: _commentController,
                                 decoration: const InputDecoration(
-                                  hintText: 'Tambahkan komentar publik...',
-                                  hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                                  hintText: 'Tulis komentar publik...',
+                                  hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
                                   border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                                  contentPadding: EdgeInsets.symmetric(vertical: 12),
                                 ),
                                 maxLines: null,
                               ),
                             ),
+                            const SizedBox(width: 8),
                             isSubmittingComment
                                 ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blueAccent),
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.blueAccent),
                                   )
-                                : IconButton(
-                                    icon: const Icon(Icons.send_rounded, color: Colors.blueAccent),
-                                    onPressed: _submitComment,
+                                : Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.blueAccent.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(Icons.send_rounded, color: Colors.blueAccent, size: 20),
+                                      onPressed: _submitComment,
+                                    ),
                                   ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
-                      // 2. DAFTAR LIST KOMENTAR DARI API
+                      // DAFTAR LIST KOMENTAR
                       (() {
                         final List comments = pinData['comments'] ?? [];
                         if (comments.isEmpty) {
                           return Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 16),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.black.withOpacity(0.03)),
+                              border: Border.all(color: const Color(0xFFF1F5F9)),
                             ),
                             child: Column(
                               children: [
-                                Icon(Icons.chat_bubble_outline_rounded, size: 36, color: Colors.grey[300]),
-                                const SizedBox(height: 10),
+                                Icon(Icons.chat_bubble_outline_rounded, size: 40, color: Colors.grey[300]),
+                                const SizedBox(height: 12),
                                 Text('Belum ada komentar', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14)),
                                 const SizedBox(height: 4),
                                 Text('Jadilah yang pertama memberikan tanggapan!', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
@@ -463,54 +566,90 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
 
                         return ListView.separated(
                           shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(), // Memakai scroll utama screen
+                          physics: const NeverScrollableScrollPhysics(),
                           itemCount: comments.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 10),
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final item = comments[index];
                             final commenter = item['user'] ?? {};
+                            
+                            String rawDate = item['created_at'] ?? '';
+                            String formattedDate = rawDate.contains('T') 
+                                ? rawDate.split('T')[0] 
+                                : rawDate.split('.')[0];
+
                             return Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.black.withOpacity(0.015)),
+                                border: Border.all(color: const Color(0xFFF1F5F9), width: 1),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 6, offset: const Offset(0, 2))
+                                ]
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: Colors.grey[200],
+                                    radius: 18,
+                                    backgroundColor: const Color(0xFFF1F5F9),
                                     backgroundImage: commenter['profile_picture'] != null
                                         ? NetworkImage(commenter['profile_picture'].toString()) as ImageProvider
                                         : null,
                                     child: commenter['profile_picture'] == null
-                                        ? const Icon(Icons.person, size: 16, color: Colors.grey)
+                                        ? const Icon(Icons.person_rounded, size: 18, color: Color(0xFF94A3B8))
                                         : null,
                                   ),
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
+                                        // HEADER KOMENTAR: Username, Tombol Hapus (Khusus Admin), dan Tanggal
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment: CrossAxisAlignment.center,
                                           children: [
-                                            Text(
-                                              commenter['username'] ?? 'Anonymous',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                                            Expanded(
+                                              child: Text(
+                                                commenter['username'] ?? 'Anonymous',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold, 
+                                                  fontSize: 13, 
+                                                  color: Color(0xFF1E293B)
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                             ),
+                                            
+                                            // TOMBOL HAPUS KHUSUS ADMIN
+                                            if (isAdmin) ...[
+                                              InkWell(
+                                                onTap: () => _handleDeleteComment(item['id']),
+                                                borderRadius: BorderRadius.circular(20),
+                                                child: const Padding(
+                                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  child: Icon(
+                                                    Icons.delete_outline_rounded,
+                                                    color: Colors.redAccent,
+                                                    size: 18,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                            ],
+                                            
                                             Text(
-                                              item['created_at'] ?? '',
-                                              style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                              formattedDate,
+                                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 6),
                                         Text(
-                                          item['content'] ?? '',
-                                          style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                                          item['comment'] ?? item['content'] ?? '',
+                                          style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.45, fontWeight: FontWeight.w400),
                                         ),
                                       ],
                                     ),
