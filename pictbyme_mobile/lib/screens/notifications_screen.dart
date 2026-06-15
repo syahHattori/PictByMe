@@ -33,7 +33,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           });
         });
 
-        // Tampilkan SnackBar notifikasi instan secara aman
         _showQuickSnackBar(payload['message'] ?? 'Anda menerima notifikasi baru');
       });
     } catch (e) {
@@ -111,64 +110,121 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               : Center(
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 700),
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        final n = items[index];
-                        final data = n['data'] ?? {};
-                        final from = data['from_user'] ?? {};
-                        final pinId = data['pin_id'];
-                        final pinTitle = data['pin_title'] ?? '';
-                        final message = data['message'] ?? '';
-                        final hasProfile = from['profile_picture'] != null && from['profile_picture'].toString().isNotEmpty;
+                    child: RefreshIndicator(
+                      color: Colors.black87,
+                      onRefresh: _load,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final n = items[index];
+                          final data = n['data'] ?? {};
+                          final from = data['from_user'] ?? {};
+                          final pin = data['pin'] ?? {};
+                          
+                          final pinId = pin['id'] ?? data['pin_id']; // Fallback jika pakai data lama
+                          final message = data['message'] ?? '';
+                          final username = from['username'] ?? 'Seseorang';
+                          final pinImageUrl = pin['image_url'];
+                          final hasProfile = from['profile_picture'] != null && from['profile_picture'].toString().isNotEmpty;
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.black.withOpacity(0.02)),
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                            leading: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Colors.blueAccent.withOpacity(0.1),
-                              backgroundImage: hasProfile ? NetworkImage(from['profile_picture'].toString()) : null,
-                              child: !hasProfile ? const Icon(Icons.person_rounded, color: Colors.blueAccent) : null,
+                          // Konfigurasi Badge Ikon Dinamis ala IG berdasarkan payload Laravel
+                          IconData iconData = Icons.notifications_rounded;
+                          Color iconColor = Colors.grey;
+                          if (data['icon'] == 'favorite') {
+                            iconData = Icons.favorite_rounded;
+                            iconColor = Colors.red;
+                          } else if (data['icon'] == 'monetization_on') {
+                            iconData = Icons.monetization_on_rounded;
+                            iconColor = Colors.amber.shade700;
+                          }
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.black.withOpacity(0.02)),
                             ),
-                            title: Text(
-                              message,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.black87),
-                            ),
-                            subtitle: pinTitle.isNotEmpty
-                                ? Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Text(
-                                      'Pin: $pinTitle',
-                                      style: TextStyle(color: Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w500),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              
+                              // 1. FOTO PROFIL DENGAN BADGE IKON DI POJOK (Gaya IG)
+                              leading: Stack(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: Colors.blueAccent.withOpacity(0.1),
+                                    backgroundImage: hasProfile ? NetworkImage(from['profile_picture'].toString()) : null,
+                                    child: !hasProfile ? const Icon(Icons.person_rounded, color: Colors.blueAccent) : null,
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(iconData, color: iconColor, size: 11),
                                     ),
-                                  )
-                                : null,
-                            trailing: Text(
-                              _timeAgo(n['created_at']?.toString() ?? ''),
-                              style: TextStyle(color: Colors.grey[400], fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+
+                              // 2. TEXT STYLE INSTAGRAM (Username dicetak Tebal)
+                              title: RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(color: Colors.black87, fontSize: 13.5, height: 1.3),
+                                  children: [
+                                    TextSpan(
+                                      text: '$username ',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    TextSpan(
+                                      text: message,
+                                      style: const TextStyle(fontWeight: FontWeight.w500),
+                                    ),
+                                    TextSpan(
+                                      text: '  ${_timeAgo(n['created_at']?.toString() ?? '')}',
+                                      style: TextStyle(color: Colors.grey[400], fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // 3. THUMBNAIL PREVIEW PIN DI SEBELAH KANAN (Gaya IG)
+                              trailing: pinImageUrl != null && pinImageUrl.toString().isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        pinImageUrl.toString(),
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Container(
+                                          width: 44,
+                                          height: 44,
+                                          color: Colors.grey[100],
+                                          child: const Icon(Icons.broken_image_outlined, size: 18, color: Colors.grey),
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                              onTap: () {
+                                if (pinId != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => PinDetailScreen(pin: {'id': pinId})),
+                                  );
+                                }
+                              },
                             ),
-                            onTap: () {
-                              if (pinId != null) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => PinDetailScreen(pin: {'id': pinId})),
-                                );
-                              }
-                            },
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),

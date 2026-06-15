@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-
 import '../services/api_service.dart';
 import '../services/event_bus.dart';
+import '../services/download_service.dart';
 
 class PinDetailScreen extends StatefulWidget {
   final Map pin;
@@ -17,6 +18,7 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
   final ApiService apiService = ApiService();
   late Map pinData;
   bool loading = true;
+  bool isDownloading = false; 
   StreamSubscription? _pinUpdateSub;
 
   @override
@@ -25,7 +27,6 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
     pinData = widget.pin;
     _refresh();
     
-    // Mendengarkan pembaruan pin eksternal secara aman
     _pinUpdateSub = PinUpdateBus.instance.stream.listen((updated) {
       try {
         if (updated['id'] == pinData['id']) {
@@ -38,7 +39,6 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
 
   @override
   void dispose() {
-    // Membatalkan subscription untuk mencegah kebocoran memori (memory leak)
     _pinUpdateSub?.cancel();
     super.dispose();
   }
@@ -48,10 +48,54 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
     try {
       final resp = await apiService.getPin(pinData['id'] as int);
       if (resp.statusCode == 200 && resp.data != null && resp.data['data'] != null) {
-        setState(() => pinData = resp.data['data']);
+        setState(() {
+          final oldSource = pinData['source_type'] ?? widget.pin['source_type'];
+          pinData = resp.data['data'];
+          if (oldSource != null) pinData['source_type'] = oldSource;
+        });
       }
     } catch (_) {}
     setState(() => loading = false);
+  }
+
+  // 🔥 FUNGSI YANG SUDAH DIPERBAIKI (MEMANGGIL DOWNLOAD SERVICE)
+  Future<void> _downloadImageToInternalStorage(String imageUrl) async {
+    if (imageUrl.isEmpty) return;
+    
+    setState(() => isDownloading = true);
+    
+    try {
+      // Memanggil fungsi download terpusat dari DownloadService
+      await DownloadService.downloadImage(
+        imageUrl, 
+        title: pinData['title']?.toString(),
+      );
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            kIsWeb 
+                ? 'Gambar berhasil diunduh ke Laptop! 💻' 
+                : 'Gambar berhasil disimpan ke Galeri HP! 💾', 
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: Colors.blue,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal mengunduh gambar: $e'), 
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => isDownloading = false);
+    }
   }
 
   Future<void> savePin(BuildContext context) async {
@@ -81,6 +125,15 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
   Widget build(BuildContext context) {
     final isLiked = (pinData['liked'] == true || pinData['liked'] == 1);
     
+    final bool isPremium = pinData['is_premium'] == true || pinData['is_premium'] == 1 || pinData['is_premium'] == '1';
+    final int priceCoin = int.tryParse(pinData['price_coin']?.toString() ?? '0') ?? 0;
+    final bool isPaidPin = isPremium || priceCoin > 0;
+
+    final String sourceType = pinData['source_type'] ?? widget.pin['source_type'] ?? '';
+    final bool isOwnedOrPurchased = sourceType == 'uploaded' || sourceType == 'purchased' || pinData['is_purchased'] == true;
+
+    final bool showDownloadButton = !isPaidPin || isOwnedOrPurchased;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -96,9 +149,7 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.share_rounded),
-            onPressed: () {
-              // Placeholder fungsi bagikan konten
-            },
+            onPressed: () {},
           ),
         ],
       ),
@@ -111,7 +162,6 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                 child: LayoutBuilder(builder: (context, constraints) {
                   final isWide = constraints.maxWidth > 750;
 
-                  // --- KOMPONEN GAMBAR: Menampilkan proporsi asli tanpa terpotong kaku ---
                   Widget imageWidget = Container(
                     constraints: BoxConstraints(
                       maxHeight: isWide ? MediaQuery.of(context).size.height * 0.75 : 500,
@@ -120,11 +170,7 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        )
+                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 8))
                       ],
                     ),
                     child: ClipRRect(
@@ -137,9 +183,7 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                           return Container(
                             height: 300,
                             color: Colors.grey[50],
-                            child: const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black26),
-                            ),
+                            child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black26)),
                           );
                         },
                         errorBuilder: (context, error, stack) => Container(
@@ -151,11 +195,9 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                     ),
                   );
 
-                  // --- KOMPONEN DETAIL & DESKRIPSI KARYA ---
                   Widget detailsColumn = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Author Card Panel
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -194,7 +236,24 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                                 ],
                               ),
                             ),
-                            // Sederetan Tombol Aksi Interaktif
+
+                            if (showDownloadButton) ...[
+                              isDownloading
+                                  ? const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 12),
+                                      child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.blueAccent)),
+                                    )
+                                  : IconButton(
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: Colors.blueAccent.withOpacity(0.1),
+                                      ),
+                                      icon: const Icon(Icons.download_for_offline_rounded, color: Colors.blueAccent, size: 22),
+                                      tooltip: 'Download ke perangkat',
+                                      onPressed: () => _downloadImageToInternalStorage(pinData['file_url'].toString()),
+                                    ),
+                              const SizedBox(width: 6),
+                            ],
+
                             IconButton(
                               style: IconButton.styleFrom(
                                 backgroundColor: isLiked ? Colors.red.withOpacity(0.08) : const Color(0xFFF1F3F5),
@@ -240,8 +299,6 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                       ),
 
                       const SizedBox(height: 24),
-
-                      // Kategori Badge Elegan
                       if (pinData['category']?['name'] != null)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -256,8 +313,6 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                         ),
 
                       const SizedBox(height: 12),
-
-                      // Judul & Deskripsi Utama
                       Text(
                         pinData['title'] ?? 'Tanpa Judul', 
                         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: Colors.black87),
@@ -267,10 +322,7 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                         pinData['description'] ?? 'Tidak ada deskripsi untuk pin ini.',
                         style: TextStyle(fontSize: 15, color: Colors.grey[700], height: 1.6, fontWeight: FontWeight.w400),
                       ),
-                      
                       const SizedBox(height: 16),
-                      
-                      // Status Statistik Suka
                       Row(
                         children: [
                           const Icon(Icons.favorite_rounded, color: Colors.redAccent, size: 16),
@@ -281,16 +333,10 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 24),
                       const Divider(height: 1, color: Color(0xFFEFEFEF)),
                       const SizedBox(height: 20),
-
-                      // --- PANEL SEKSI KOMENTAR ---
-                      const Text(
-                        'Comments', 
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
-                      ),
+                      const Text('Comments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
                       const SizedBox(height: 12),
                       Container(
                         width: double.infinity,
@@ -304,22 +350,15 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                           children: [
                             Icon(Icons.chat_bubble_outline_rounded, size: 36, color: Colors.grey[300]),
                             const SizedBox(height: 10),
-                            Text(
-                              'Belum ada komentar',
-                              style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
+                            Text('Belum ada komentar', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14)),
                             const SizedBox(height: 4),
-                            Text(
-                              'Jadilah yang pertama memberikan tanggapan!',
-                              style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                            ),
+                            Text('Jadilah yang pertama memberikan tanggapan!', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
                           ],
                         ),
                       ),
                     ],
                   );
 
-                  // Skema pembagian tata letak responsif desktop / tablet lebar
                   if (isWide) {
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,7 +370,6 @@ class _PinDetailScreenState extends State<PinDetailScreen> {
                     );
                   }
 
-                  // Tata letak default ponsel
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

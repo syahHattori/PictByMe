@@ -39,7 +39,6 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
     final bool isMobile = screenWidth < 800;
 
     if (isMobile) {
-      // Tampilan Mobile: Menggunakan Bottom Sheet dari bawah layar
       final result = await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
@@ -54,7 +53,6 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
       );
       return (result == true);
     } else {
-      // Tampilan Desktop/Web: Diubah menjadi Dialog Tengah yang proporsional
       final result = await showDialog<bool>(
         context: context,
         builder: (ctx) => Dialog(
@@ -78,18 +76,27 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
     setState(() => isLoading = true);
     try {
       final myPinsResp = await apiService.getMyPins();
-final purchasedResp = await apiService.getPurchasedPins();
+      final purchasedResp = await apiService.getPurchasedPins();
 
-setState(() {
-  pins = [
-    ...(myPinsResp.data['data'] ?? []),
-    ...(purchasedResp.data['data'] ?? []),
-  ];
+      // Memisahkan data mentah array dari response masing-masing API
+      final List rawMyPins = myPinsResp.data['data'] ?? [];
+      final List rawPurchasedPins = purchasedResp.data['data'] ?? [];
 
-  isLoading = false;
-});
+      // 🔥 MAP DATA: Memberikan flag pembeda tipe sumber pin secara aman
+      final List mappedMyPins = rawMyPins.map((item) {
+        return {...Map<String, dynamic>.from(item), 'source_type': 'uploaded'};
+      }).toList();
+
+      final List mappedPurchasedPins = rawPurchasedPins.map((item) {
+        return {...Map<String, dynamic>.from(item), 'source_type': 'purchased'};
+      }).toList();
+
+      setState(() {
+        pins = [...mappedMyPins, ...mappedPurchasedPins];
+        isLoading = false;
+      });
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint("Gagal menggabungkan koleksi pin: $e");
       setState(() => isLoading = false);
     }
   }
@@ -174,7 +181,7 @@ setState(() {
                         Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[300]),
                         const SizedBox(height: 12),
                         const Text(
-                          'Belum ada karya pin yang kamu unggah',
+                          'Belum ada karya pin di koleksi Anda',
                           style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 14),
                         ),
                       ],
@@ -182,7 +189,6 @@ setState(() {
                   )
                 : LayoutBuilder(builder: (context, constraints) {
                     final width = constraints.maxWidth;
-                    // Skala grid fleksibel: 2 kolom di HP cerdas, hingga 5 kolom di monitor lebar
                     final crossAxisCount = (width / 220).floor().clamp(2, 5);
 
                     return MasonryGridView.count(
@@ -193,6 +199,8 @@ setState(() {
                       itemCount: pins.length,
                       itemBuilder: (context, index) {
                         final pin = pins[index];
+                        final String sourceType = pin['source_type'] ?? 'uploaded';
+
                         return Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -209,7 +217,6 @@ setState(() {
                             borderRadius: BorderRadius.circular(16),
                             child: Stack(
                               children: [
-                                // --- KOMPONEN 1: GAMBAR MURNI ---
                                 Image.network(
                                   pin['file_url'].toString(),
                                   fit: BoxFit.cover,
@@ -234,7 +241,6 @@ setState(() {
                                   ),
                                 ),
 
-                                // --- KOMPONEN 2: GRADIENT OVERLAY ---
                                 Positioned.fill(
                                   child: Container(
                                     decoration: BoxDecoration(
@@ -252,10 +258,49 @@ setState(() {
                                   ),
                                 ),
 
-                                // --- KOMPONEN 3: TEKS JUDUL (Kiri Bawah) ---
+                                // 🔥 Tombol klik navigasi utama masuk detail
+                                Positioned.fill(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin))),
+                                    ),
+                                  ),
+                                ),
+
+                                // 🔥 BADGE STATUS IDENTITAS (Kiri Atas) - Unggahan Sendiri vs Hasil Membeli
+                                Positioned(
+                                  top: 8,
+                                  left: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: sourceType == 'purchased'
+                                          ? Colors.amber.shade800.withOpacity(0.9)
+                                          : Colors.blueAccent.withOpacity(0.9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          sourceType == 'purchased' ? Icons.shopping_bag_rounded : Icons.cloud_done_rounded,
+                                          color: Colors.white,
+                                          size: 11,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          sourceType == 'purchased' ? 'DIBELI' : 'SAYA UNGGAH',
+                                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
                                 Positioned(
                                   left: 12,
-                                  right: 45, // Memberikan ruang agar teks tidak menabrak tombol menu titik tiga jika sejajar
+                                  right: 45, 
                                   bottom: 12,
                                   child: Text(
                                     pin['title'] ?? 'Tanpa Judul',
@@ -272,18 +317,7 @@ setState(() {
                                   ),
                                 ),
 
-                                // --- KOMPONEN 4: LAPISAN KLIK AKTIF (INKWELL) ---
-                                Positioned.fill(
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin))),
-                                    ),
-                                  ),
-                                ),
-
-                                // --- KOMPONEN 5: FLOATING MENU TITIK 3 (Kanan Atas) ---
-                                // Diletakkan paling atas agar deteksi ketukan PopupMenuButton tidak terhalang InkWell utama
+                                // Menu Aksi Titik Tiga (Sembunyikan/Nonaktifkan tombol edit jika item berasal dari membelI)
                                 Positioned(
                                   top: 8,
                                   right: 8,
@@ -317,27 +351,25 @@ setState(() {
                                             await _deletePinAction(pin);
                                           }
                                         },
-                                        itemBuilder: (_) => const [
-                                          PopupMenuItem(
-                                            value: 1, 
-                                            child: ListTile(
-                                              dense: true,
-                                              contentPadding: EdgeInsets.zero,
-                                             leading: Icon(
-  Icons.edit_rounded,
-  color: Colors.blue,
-  size: 18,
-),
-                                              title: Text('Edit Pin', style: TextStyle(fontWeight: FontWeight.w600))
-                                            )
-                                          ),
+                                        itemBuilder: (_) => [
+                                          // Hanya izinkan edit jika itu foto unggahan milik sendiri
+                                          if (sourceType == 'uploaded')
+                                            const PopupMenuItem(
+                                              value: 1, 
+                                              child: ListTile(
+                                                dense: true,
+                                                contentPadding: EdgeInsets.zero,
+                                                leading: Icon(Icons.edit_rounded, color: Colors.blue, size: 18),
+                                                title: Text('Edit Pin', style: TextStyle(fontWeight: FontWeight.w600))
+                                              )
+                                            ),
                                           PopupMenuItem(
                                             value: 2, 
                                             child: ListTile(
                                               dense: true,
                                               contentPadding: EdgeInsets.zero,
-                                              leading: Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18), 
-                                              title: Text('Hapus', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.redAccent))
+                                              leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18), 
+                                              title: Text(sourceType == 'purchased' ? 'Hapus Koleksi' : 'Hapus Permanen', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.redAccent))
                                             )
                                           ),
                                         ],

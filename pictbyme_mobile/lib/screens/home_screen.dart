@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'pin_detail_screen.dart';
@@ -11,6 +12,7 @@ import 'marketplace_screen.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../services/coin_controller.dart';
 import 'my_pins_screen.dart';
+import '../services/notification_service.dart'; // 🔥 Import layanan notifikasi realtime
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,9 +29,13 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isNotificationHovered = false;
   int unreadNotificationCount = 0;
   final ApiService apiService = ApiService();
-  List pins = [];
+  
+  List pins = []; // Master data dari API
+  List filteredPins = []; // 🔥 Data hasil filter Live Search
+  
   bool isLoading = true;
   String? profilePicUrl;
+  StreamSubscription<Map<String, dynamic>>? _notificationSub; // 🔥 Subskripsi realtime
 
   @override
   void initState() {
@@ -37,6 +43,24 @@ class _HomeScreenState extends State<HomeScreen> {
     loadPins();
     loadUnreadNotifications();
     loadUserProfile(); 
+    
+    // 🔥 Dengarkan notifikasi masuk secara realtime untuk menyalakan titik merah instan
+    try {
+      _notificationSub = NotificationService().stream.listen((payload) {
+        if (!mounted) return;
+        setState(() {
+          unreadNotificationCount++;
+        });
+      });
+    } catch (e) {
+      debugPrint("Gagal memuat realtime notification handler di Home: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel(); // Bersihkan stream saat widget dihancurkan
+    super.dispose();
   }
 
   // 👤 Mengambil data profil & menyinkronkan saldo koin global dengan database
@@ -50,22 +74,16 @@ class _HomeScreenState extends State<HomeScreen> {
           profilePicUrl = userData['profile_picture']?.toString();
         });
 
-        // 🔥 CORE FIX: Sinkronisasi saldo koin dari API ke CoinController global
-      final rawCoins = userData['coin_balance']
-    ?? userData['coins']
-    ?? userData['coin']
-    ?? userData['balance'];
+        final rawCoins = userData['coin_balance'] ?? userData['coins'] ?? userData['coin'] ?? userData['balance'];
         if (rawCoins != null) {
           int coinValue = 0;
           if (rawCoins is int) coinValue = rawCoins;
           else if (rawCoins is double) coinValue = rawCoins.toInt();
           else if (rawCoins is String) coinValue = int.tryParse(rawCoins) ?? 0;
 
-          // Perbarui nilai notifier global agar semua halaman yang memakai koin ikut terupdate
           CoinController().balance.value = coinValue;
         }
       }
-      print("HASIL URL FOTO SEKARANG: $profilePicUrl");
     } catch (e) {
       print('LOAD USER PROFILE ERROR: $e');
     }
@@ -105,11 +123,43 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         pins = visible;
+        filteredPins = visible; // 🔥 Sinkronkan penampung pencarian di awal
         isLoading = false;
       });
     } catch (e) {
       setState(() {
         isLoading = false;
+      });
+    }
+  }
+
+  // 🔥 LOGIKA LIVE SEARCH (Filter Judul, Deskripsi, dan Kategori)
+  void _filterPins(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        filteredPins = pins;
+      });
+    } else {
+      final lowercaseQuery = query.toLowerCase();
+      setState(() {
+        filteredPins = pins.where((pin) {
+          final title = (pin['title'] ?? '').toString().toLowerCase();
+          final description = (pin['description'] ?? '').toString().toLowerCase();
+          
+          // Mengamankan pembacaan data kategori baik bertipe String maupun Map Object
+          String categoryStr = '';
+          if (pin['category'] != null) {
+            if (pin['category'] is Map) {
+              categoryStr = (pin['category']['name'] ?? pin['category']['title'] ?? '').toString().toLowerCase();
+            } else {
+              categoryStr = pin['category'].toString().toLowerCase();
+            }
+          }
+
+          return title.contains(lowercaseQuery) || 
+                 description.contains(lowercaseQuery) || 
+                 categoryStr.contains(lowercaseQuery);
+        }).toList();
       });
     }
   }
@@ -186,7 +236,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
     }
     
-    // Refresh pin dan saldo koin setelah proses pembuatan pin selesai
     await loadPins();
     await loadUserProfile();
   }
@@ -211,19 +260,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Icon(Icons.camera_alt_rounded, color: colorScheme.primary, size: 45),
                           const SizedBox(height: 10),
-                          const Text(
-                            'PictByMe Navigasi',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
+                          const Text('PictByMe Navigasi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.home),
-                    title: const Text('Home Feed'),
-                    onTap: () => Navigator.pop(context),
-                  ),
+                  ListTile(leading: const Icon(Icons.home), title: const Text('Home Feed'), onTap: () => Navigator.pop(context)),
                   ListTile(
                     leading: const Icon(Icons.folder),
                     title: const Text('Albums / Boards'),
@@ -249,17 +291,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () async {
                       Navigator.pop(context);
                       await Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
-                      loadUserProfile(); // Sync koin jika ada transaksi di marketplace
+                      loadUserProfile();
                     },
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.add_box),
-                    title: const Text('Create New Pin'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      goToCreatePin();
-                    },
-                  ),
+                  ListTile(leading: const Icon(Icons.add_box), title: const Text('Create New Pin'), onTap: () { Navigator.pop(context); goToCreatePin(); }),
                   const Spacer(),
                   const Divider(),
                   ListTile(
@@ -288,56 +323,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 25),
                   Icon(Icons.camera_alt_rounded, color: colorScheme.primary, size: 35),
                   const SizedBox(height: 40),
-                  
                   _buildSidebarItem(icon: Icons.home, index: 0, colorScheme: colorScheme, onTap: () {}),
                   const SizedBox(height: 15),
-                  
-                  _buildSidebarItem(
-                    icon: Icons.folder,
-                    index: 1,
-                    colorScheme: colorScheme,
-                    onTap: () async {
-                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
-                      loadUserProfile();
-                    },
-                  ),
+                  _buildSidebarItem(icon: Icons.folder, index: 1, colorScheme: colorScheme, onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen())); loadUserProfile(); }),
                   const SizedBox(height: 15),
-                  
-                  _buildSidebarItem(
-                    icon: Icons.collections,
-                    index: 5,
-                    colorScheme: colorScheme,
-                    onTap: () async {
-                      final changed = await Navigator.push(context, MaterialPageRoute(builder: (_) => const MyPinsScreen()));
-                      if (changed == true) await loadPins();
-                      loadUserProfile();
-                    },
-                  ),
+                  _buildSidebarItem(icon: Icons.collections, index: 5, colorScheme: colorScheme, onTap: () async { final changed = await Navigator.push(context, MaterialPageRoute(builder: (_) => const MyPinsScreen())); if (changed == true) await loadPins(); loadUserProfile(); }),
                   const SizedBox(height: 15),
-                  
-                  _buildSidebarItem(
-                    icon: Icons.storefront,
-                    index: 2,
-                    colorScheme: colorScheme,
-                    onTap: () async {
-                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
-                      loadUserProfile(); // Sync koin pasca beli pin premium
-                    },
-                  ),
+                  _buildSidebarItem(icon: Icons.storefront, index: 2, colorScheme: colorScheme, onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())); loadUserProfile(); }),
                   const SizedBox(height: 15),
-                  
                   _buildSidebarItem(icon: Icons.add_box, index: 3, colorScheme: colorScheme, onTap: goToCreatePin),
                   const Spacer(),
-                  
-                  _buildSidebarItem(
-                    icon: Icons.settings,
-                    index: 4,
-                    colorScheme: colorScheme,
-                    onTap: () async {
-                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                      loadUserProfile();
-                    },
-                  ),
+                  _buildSidebarItem(icon: Icons.settings, index: 4, colorScheme: colorScheme, onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())); loadUserProfile(); }),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -361,14 +357,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  'PictByMe',
-                                  style: TextStyle(
-                                    color: colorScheme.primary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                Text('PictByMe', style: TextStyle(color: colorScheme.primary, fontSize: 18, fontWeight: FontWeight.bold)),
                                 const Spacer(),
                                 _buildNotificationButton(colorScheme),
                                 const SizedBox(width: 10),
@@ -401,8 +390,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           final width = constraints.maxWidth;
                           final crossAxisCount = (width / 300).floor().clamp(2, 6);
 
-                          if (pins.isEmpty) {
-                            return _buildEmptyState();
+                          // Jika pencarian tidak menghasilkan apapun
+                          if (filteredPins.isEmpty) {
+                            return _buildEmptyState(isSearchEmpty: pins.isNotEmpty);
                           }
 
                           return MasonryGridView.count(
@@ -410,9 +400,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             mainAxisSpacing: 15,
                             crossAxisSpacing: 15,
                             padding: const EdgeInsets.all(20),
-                            itemCount: pins.length,
+                            itemCount: filteredPins.length, // 🔥 Pakai data ter-filter
                             itemBuilder: (context, index) {
-                              final pin = pins[index];
+                              final pin = filteredPins[index]; // 🔥 Pakai data ter-filter
                               final isHovered = hoveredIndex == index;
 
                               return MouseRegion(
@@ -441,7 +431,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                             pin['file_url'].toString(),
                                             fit: BoxFit.cover,
                                             errorBuilder: (context, error, stackTrace) {
-                                              debugPrint(error.toString());
                                               return Container(
                                                 height: 120,
                                                 color: Colors.grey[100],
@@ -491,8 +480,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchTextField() {
     return TextField(
+      onChanged: _filterPins, // 🔥 Memicu Live Search setiap kali karakter berubah
       decoration: InputDecoration(
-        hintText: 'Search photos...',
+        hintText: 'Search photos, categories or description...',
         prefixIcon: const Icon(Icons.search),
         filled: true,
         fillColor: Colors.grey.shade100,
@@ -518,10 +508,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (!mounted) return;
 
-          Navigator.push(
+          // Tunggu user kembali dari halaman Notifikasi
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
           );
+          
+          // 🔥 Sinkronisasi ulang jumlah unread setelah halaman ditutup
+          loadUnreadNotifications();
         },
         child: Stack(
           alignment: Alignment.center,
@@ -532,9 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(9),
               transform: Matrix4.identity()..scale(isNotificationHovered ? 1.06 : 1.0),
               decoration: BoxDecoration(
-                color: isNotificationHovered
-                    ? colorScheme.primary.withOpacity(0.08)
-                    : const Color(0xFFF1F3F5),
+                color: isNotificationHovered ? colorScheme.primary.withOpacity(0.08) : const Color(0xFFF1F3F5),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -543,17 +535,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: 22,
               ),
             ),
+            // 🔴 TITIK MERAH AKTIF SECARA DINAMIS
             if (unreadNotificationCount > 0)
               Positioned(
                 top: 2,
                 right: 2,
                 child: Container(
-                  width: 11,
-                  height: 11,
+                  width: 12,
+                  height: 12,
                   decoration: BoxDecoration(
-                    color: Colors.red,
+                    color: Colors.redAccent,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5), 
+                    border: Border.all(color: Colors.white, width: 2), 
                   ),
                 ),
               ),
@@ -570,7 +563,6 @@ class _HomeScreenState extends State<HomeScreen> {
       onExit: (_) => setState(() => isCoinHovered = false),
       child: GestureDetector(
         onTap: () async {
-          // 🔥 SYNC COIN: Refresh data koin setelah kembali dari Top Up screen
           await Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
           loadUserProfile();
         },
@@ -600,7 +592,6 @@ class _HomeScreenState extends State<HomeScreen> {
       onExit: (_) => setState(() => isProfileHovered = false),
       child: GestureDetector(
         onTap: () async {
-          // 🔥 SYNC COIN: Refresh data setelah kembali dari halaman Profil/Kelola User
           await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
           loadUserProfile();
         },
@@ -657,38 +648,48 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({bool isSearchEmpty = false}) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(36.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.photo_library_outlined, size: 72, color: Colors.grey),
+            Icon(
+              isSearchEmpty ? Icons.search_off_rounded : Icons.photo_library_outlined, 
+              size: 72, 
+              color: Colors.grey,
+            ),
             const SizedBox(height: 18),
-            Text('Belum ada Pin gratis saat ini', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              isSearchEmpty ? 'Hasil tidak ditemukan' : 'Belum ada Pin gratis saat ini', 
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text(
-              'Sebagian pin mungkin berbayar dan tersedia di Marketplace. Jelajahi Marketplace atau buat pin baru.',
+              isSearchEmpty 
+                  ? 'Coba gunakan kata kunci pencarian yang lain.' 
+                  : 'Sebagian pin mungkin berbayar dan tersedia di Marketplace. Jelajahi Marketplace atau buat pin baru.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600]),
             ),
             const SizedBox(height: 18),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
-                  child: const Text('Buka Marketplace'),
-                ),
-                OutlinedButton(
-                  onPressed: goToCreatePin,
-                  child: const Text('Buat Pin Baru'),
-                ),
-              ],
-            ),
+            if (!isSearchEmpty)
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
+                    child: const Text('Buka Marketplace'),
+                  ),
+                  OutlinedButton(
+                    onPressed: goToCreatePin,
+                    child: const Text('Buat Pin Baru'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
