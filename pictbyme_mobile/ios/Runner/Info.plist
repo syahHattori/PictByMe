@@ -66,5 +66,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+<key>NSPhotoLibraryAddUsageDescription</key>
+<string>Aplikasi ini membutuhkan izin untuk menyimpan foto langsung ke aplikasi Photos Anda.</string>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Aplikasi ini membutuhkan akses galeri untuk mengunduh gambar.</string>
 </dict>
 </plist>
