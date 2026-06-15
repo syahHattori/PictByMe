@@ -13,8 +13,9 @@ class _TopupScreenState extends State<TopupScreen> {
   final ApiService apiService = ApiService();
   final TextEditingController amountController = TextEditingController();
 
-  String? qrImage;
-  bool isLoading = false;
+ String? qrImage;
+String? qrCode;
+bool isLoading = false;
 
   @override
   void initState() {
@@ -88,11 +89,44 @@ if (rawCoins != null) {
       final response = await apiService.topup(amount: amount);
       if (!mounted) return;
 
-      setState(() {
-        qrImage = response.data['onopay_response']?['data']?['qr_image'] ?? response.data['qr_image'];
-        isLoading = false;
-      });
+     setState(() {
+  qrImage = response.data['onopay_response']?['data']?['qr_image']
+      ?? response.data['qr_image'];
 
+  qrCode = response.data['onopay_response']?['data']?['qr_code'];
+
+  isLoading = false;
+});
+if (qrCode != null) {
+  Future.delayed(const Duration(seconds: 10), () async {
+    try {
+      final checkResp = await apiService.checkPaymentStatus(
+        qrCode: qrCode!,
+        amount: amount,
+      );
+
+      debugPrint("CHECK STATUS:");
+      debugPrint(checkResp.data.toString());
+
+      if (checkResp.data['success'] == true) {
+        final newBalance = checkResp.data['new_balance'];
+
+        if (newBalance != null) {
+          await CoinController().setBalance(newBalance);
+        }
+
+        if (mounted) {
+          _showSnackBar(
+            'Pembayaran berhasil, koin ditambahkan!',
+            Colors.green,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("CHECK STATUS ERROR: $e");
+    }
+  });
+}
       try {
         final newBal = response.data['data']?['balance'] ?? response.data['balance'];
         if (newBal != null && newBal is int) {
