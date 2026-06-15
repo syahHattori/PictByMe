@@ -35,8 +35,15 @@ debugPrint("APP TOKEN = $token");
       final api = ApiService();
       final resp = await api.getProfile();
       if (resp.statusCode == 200 && resp.data != null) {
-       final userId = resp.data['user']['id'];
-        await NotificationService().init(userId: userId);
+     print("PROFILE RESPONSE = ${resp.data}");
+
+final userId = resp.data['user']['id'];
+
+print("INIT NOTIFICATION USER = $userId");
+
+await NotificationService().init(
+  userId: userId,
+);
       }
     }
   } catch (e) {

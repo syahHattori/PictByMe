@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pusher_client/pusher_client.dart';
 
@@ -43,25 +42,50 @@ class NotificationService {
         }),
       );
 
+      print("PUSHER KEY = $key");
+      print("PUSHER CLUSTER = $pusherCluster");
+
       _pusher = PusherClient(key, options, autoConnect: true);
+
+      _pusher?.onConnectionStateChange((state) {
+        print("PUSHER STATE = ${state?.currentState}");
+      });
+
+      _pusher?.onConnectionError((error) {
+        print("PUSHER ERROR = ${error?.message}");
+      });
+
       _pusher?.connect();
 
       _channelName = 'private-App.Models.User.$userId';
       _channel = _pusher?.subscribe(_channelName!);
+      print("SUBSCRIBE CHANNEL = $_channelName");
 
       // Listen for Laravel broadcast notification event
-      _channel?.bind('Illuminate\\Notifications\\Events\\BroadcastNotificationCreated', (event) {
-        if (event == null) return;
-        final dataStr = (event as dynamic).data;
-        if (dataStr == null) return;
-        try {
-          final Map<String, dynamic> payload = json.decode(dataStr as String);
-          final data = payload['data'] ?? payload;
-          _controller.add(Map<String, dynamic>.from(data));
-        } catch (_) {}
-      });
-    } catch (e) {
-      // ignore - if broadcaster not configured or keys missing, we'll silently fail
+      _channel?.bind(
+        'Illuminate\\Notifications\\Events\\BroadcastNotificationCreated',
+        (event) {
+          print("NOTIFICATION EVENT = ${event?.data}");
+
+          if (event?.data == null) return;
+
+          try {
+            final payload = json.decode(event!.data!);
+
+            print("PAYLOAD = $payload");
+
+            final data = payload['data'] ?? payload;
+
+            _controller.add(
+              Map<String, dynamic>.from(data),
+            );
+          } catch (e) {
+            print("PARSE ERROR = $e");
+          }
+        },
+      );
+    } catch (e) { // <-- PERBAIKAN: Menutup blok try utama di fungsi init
+      print("PUSHER INIT ERROR = $e");
     }
   }
 

@@ -12,7 +12,7 @@ import 'marketplace_screen.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../services/coin_controller.dart';
 import 'my_pins_screen.dart';
-import '../services/notification_service.dart'; // 🔥 Import layanan notifikasi realtime
+// 🔥 Import NotificationService telah dihapus karena beralih ke Polling
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,7 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
   
   bool isLoading = true;
   String? profilePicUrl;
-  StreamSubscription<Map<String, dynamic>>? _notificationSub; // 🔥 Subskripsi realtime
+  StreamSubscription<Map<String, dynamic>>? _notificationSub; // Subskripsi realtime (idle)
+  Timer? _notificationTimer; // 🔥 Timer untuk periodic polling setiap 10 detik
 
   @override
   void initState() {
@@ -44,22 +45,20 @@ class _HomeScreenState extends State<HomeScreen> {
     loadUnreadNotifications();
     loadUserProfile(); 
     
-    // 🔥 Dengarkan notifikasi masuk secara realtime untuk menyalakan titik merah instan
-    try {
-      _notificationSub = NotificationService().stream.listen((payload) {
+    // 🔥 Mengganti realtime listener dengan Polling API setiap 10 detik
+    _notificationTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) async {
         if (!mounted) return;
-        setState(() {
-          unreadNotificationCount++;
-        });
-      });
-    } catch (e) {
-      debugPrint("Gagal memuat realtime notification handler di Home: $e");
-    }
+        await loadUnreadNotifications();
+      },
+    );
   }
 
   @override
   void dispose() {
-    _notificationSub?.cancel(); // Bersihkan stream saat widget dihancurkan
+    _notificationTimer?.cancel(); // 🔥 Hentikan timer polling agar tidak memory leak
+    _notificationSub?.cancel(); // Bersihkan stream sisa jika ada
     super.dispose();
   }
 
@@ -390,7 +389,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           final width = constraints.maxWidth;
                           final crossAxisCount = (width / 300).floor().clamp(2, 6);
 
-                          // Jika pencarian tidak menghasilkan apapun
                           if (filteredPins.isEmpty) {
                             return _buildEmptyState(isSearchEmpty: pins.isNotEmpty);
                           }
@@ -400,9 +398,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             mainAxisSpacing: 15,
                             crossAxisSpacing: 15,
                             padding: const EdgeInsets.all(20),
-                            itemCount: filteredPins.length, // 🔥 Pakai data ter-filter
+                            itemCount: filteredPins.length,
                             itemBuilder: (context, index) {
-                              final pin = filteredPins[index]; // 🔥 Pakai data ter-filter
+                              final pin = filteredPins[index];
                               final isHovered = hoveredIndex == index;
 
                               return MouseRegion(
@@ -480,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchTextField() {
     return TextField(
-      onChanged: _filterPins, // 🔥 Memicu Live Search setiap kali karakter berubah
+      onChanged: _filterPins,
       decoration: InputDecoration(
         hintText: 'Search photos, categories or description...',
         prefixIcon: const Icon(Icons.search),
@@ -508,13 +506,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (!mounted) return;
 
-          // Tunggu user kembali dari halaman Notifikasi
           await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
           );
           
-          // 🔥 Sinkronisasi ulang jumlah unread setelah halaman ditutup
           loadUnreadNotifications();
         },
         child: Stack(
@@ -535,7 +531,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: 22,
               ),
             ),
-            // 🔴 TITIK MERAH AKTIF SECARA DINAMIS
             if (unreadNotificationCount > 0)
               Positioned(
                 top: 2,

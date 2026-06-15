@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/theme_controller.dart';
-
+import '../services/api_service.dart'; // Ditambahkan untuk akses Profile API
 import 'admin_dashboard_screen.dart';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -11,6 +12,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final ApiService apiService = ApiService(); // Instance ApiService
+  String userRole = ''; // State untuk menyimpan role user
+
   bool notifications = true;
   bool darkMode = false;
   bool showProfilePublic = true;
@@ -25,6 +29,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadPrefs();
+    _loadUserRole(); // Ambil role saat halaman pertama kali dibuka
+  }
+
+  // FUNGSI UNTUK MENGAMBIL ROLE DARI PROFILE API
+  Future<void> _loadUserRole() async {
+    try {
+      final profile = await apiService.getProfile();
+      
+      if (profile.statusCode == 200 && profile.data != null) {
+        final role = profile.data['user']['role'];
+        print("USER ROLE = $role"); // Debug log sesuai permintaan
+
+        if (mounted) {
+          setState(() {
+            userRole = role ?? '';
+          });
+        }
+      }
+    } catch (e) {
+      print("ERROR GET PROFILE ROLE = $e");
+    }
   }
 
   Future<void> _loadPrefs() async {
@@ -184,52 +209,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(10)),
                           child: const Icon(
-  Icons.privacy_tip_outlined,
-  color: Colors.black87,
-  size: 20,
-)
+                            Icons.privacy_tip_outlined,
+                            color: Colors.black87,
+                            size: 20,
+                          ),
                         ),
                         title: const Text('Ubah Kata Sandi', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                         trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
                         onTap: _showChangePasswordDialog,
                       ),
-ListTile(
-  leading: Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: Colors.grey[100],
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: const Icon(
-      Icons.admin_panel_settings,
-      color: Colors.black87,
-      size: 20,
-    ),
-  ),
-  title: const Text(
-    'Admin Panel',
-    style: TextStyle(
-      fontWeight: FontWeight.w600,
-      fontSize: 15,
-    ),
-  ),
-  subtitle: const Text(
-    'Kelola user, coin, password dan akun',
-  ),
-  trailing: const Icon(
-    Icons.arrow_forward_ios_rounded,
-    size: 14,
-    color: Colors.grey,
-  ),
-  onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const AdminDashboardScreen(),
-    ),
-  );
-},
-),
+
+                      // CONDITIONAL RENDERING: HANYA MUNCUL JIKA USERROLE AKUN ADALAH ADMIN
+                      if (userRole == 'admin')
+                        ListTile(
+                          leading: const Icon(Icons.admin_panel_settings),
+                          title: const Text('Admin Panel'),
+                          subtitle: const Text('Kelola user, coin, password dan akun'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AdminDashboardScreen(),
+                              ),
+                            );
+                          },
+                        ),
+
                       ListTile(
                         leading: Container(
                           padding: const EdgeInsets.all(8),
@@ -338,8 +344,6 @@ ListTile(
             onPressed: () {
               if (formKey.currentState == null) return;
               if (!formKey.currentState!.validate()) return;
-              
-              // Tempat menaruh integrasi API di masa mendatang
               Navigator.pop(ctx, true);
             },
             child: const Text('Perbarui'),
