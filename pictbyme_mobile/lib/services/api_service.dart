@@ -335,7 +335,27 @@ Future<Response> topup({
     ),
   );
 }
+// 🔥 TAMBAHKAN INI: Fungsi untuk cek status pembayaran
+  Future<Response> checkPaymentStatus({
+    required String qrCode,
+    required int amount,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
 
+    return await dio.post(
+      '/topup/check-status',
+      data: {
+        'qr_code': qrCode,
+        'amount': amount,
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
   Future<Response> purchasePin({
     required int pinId,
   }) async {

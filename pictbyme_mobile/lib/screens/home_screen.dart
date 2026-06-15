@@ -39,30 +39,43 @@ class _HomeScreenState extends State<HomeScreen> {
     loadUserProfile(); 
   }
 
-  // 👤 Mengambil data profil user (Sudah disesuaikan dengan response backend)
+  // 👤 Mengambil data profil & menyinkronkan saldo koin global dengan database
   Future<void> loadUserProfile() async {
     try {
       final resp = await apiService.getProfile(); 
-      setState(() {
-        profilePicUrl = resp.data['user']['profile_picture']?.toString();
-      });
+      if (resp.data != null && resp.data['user'] != null) {
+        final userData = resp.data['user'];
+        
+        setState(() {
+          profilePicUrl = userData['profile_picture']?.toString();
+        });
+
+        // 🔥 CORE FIX: Sinkronisasi saldo koin dari API ke CoinController global
+      final rawCoins = userData['coin_balance']
+    ?? userData['coins']
+    ?? userData['coin']
+    ?? userData['balance'];
+        if (rawCoins != null) {
+          int coinValue = 0;
+          if (rawCoins is int) coinValue = rawCoins;
+          else if (rawCoins is double) coinValue = rawCoins.toInt();
+          else if (rawCoins is String) coinValue = int.tryParse(rawCoins) ?? 0;
+
+          // Perbarui nilai notifier global agar semua halaman yang memakai koin ikut terupdate
+          CoinController().balance.value = coinValue;
+        }
+      }
       print("HASIL URL FOTO SEKARANG: $profilePicUrl");
     } catch (e) {
       print('LOAD USER PROFILE ERROR: $e');
     }
   }
 
-  // 🔔 Mengambil jumlah notifikasi yang belum dibaca (Dibuat fleksibel terhadap struktur objek)
+  // 🔔 Mengambil jumlah notifikasi yang belum dibaca
   Future<void> loadUnreadNotifications() async {
     try {
       final resp = await apiService.getUnreadNotificationCount();
-      
-      print("====== DEBUG NOTIF RESP ======");
-      print(resp.data);
-      print("==============================");
-
       setState(() {
-        // Otomatis membaca dari resp.data['count'] atau resp.data['data']['count']
         unreadNotificationCount = resp.data['count'] ?? resp.data['data']?['count'] ?? 0;
       });
     } catch (e) {
@@ -170,10 +183,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (result is Map && result['isPaid'] == true) {
       if (!mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
-    } else {
-      await loadPins();
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
     }
+    
+    // Refresh pin dan saldo koin setelah proses pembuatan pin selesai
+    await loadPins();
+    await loadUserProfile();
   }
 
   @override
@@ -212,9 +227,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ListTile(
                     leading: const Icon(Icons.folder),
                     title: const Text('Albums / Boards'),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
+                      loadUserProfile();
                     },
                   ),
                   ListTile(
@@ -224,14 +240,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.pop(context);
                       final changed = await Navigator.push(context, MaterialPageRoute(builder: (_) => const MyPinsScreen()));
                       if (changed == true) await loadPins();
+                      loadUserProfile();
                     },
                   ),
                   ListTile(
                     leading: const Icon(Icons.storefront),
                     title: const Text('Marketplace'),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
+                      loadUserProfile(); // Sync koin jika ada transaksi di marketplace
                     },
                   ),
                   ListTile(
@@ -247,9 +265,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ListTile(
                     leading: const Icon(Icons.settings),
                     title: const Text('Settings'),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                      loadUserProfile();
                     },
                   ),
                   const SizedBox(height: 15),
@@ -277,8 +296,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.folder,
                     index: 1,
                     colorScheme: colorScheme,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
+                    onTap: () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
+                      loadUserProfile();
                     },
                   ),
                   const SizedBox(height: 15),
@@ -290,6 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () async {
                       final changed = await Navigator.push(context, MaterialPageRoute(builder: (_) => const MyPinsScreen()));
                       if (changed == true) await loadPins();
+                      loadUserProfile();
                     },
                   ),
                   const SizedBox(height: 15),
@@ -298,8 +319,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.storefront,
                     index: 2,
                     colorScheme: colorScheme,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
+                    onTap: () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen()));
+                      loadUserProfile(); // Sync koin pasca beli pin premium
                     },
                   ),
                   const SizedBox(height: 15),
@@ -311,8 +333,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.settings,
                     index: 4,
                     colorScheme: colorScheme,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                    onTap: () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                      loadUserProfile();
                     },
                   ),
                   const SizedBox(height: 20),
@@ -479,7 +502,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 🔴 UPDATE: Desain tombol notifikasi beserta bintik merah dinamis
   Widget _buildNotificationButton(ColorScheme colorScheme) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -521,8 +543,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: 22,
               ),
             ),
-            
-            // INDIKATOR BINTIK MERAH NOTIFIKASI BARU
             if (unreadNotificationCount > 0)
               Positioned(
                 top: 2,
@@ -549,8 +569,10 @@ class _HomeScreenState extends State<HomeScreen> {
       onEnter: (_) => setState(() => isCoinHovered = true),
       onExit: (_) => setState(() => isCoinHovered = false),
       child: GestureDetector(
-        onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
+        onTap: () async {
+          // 🔥 SYNC COIN: Refresh data koin setelah kembali dari Top Up screen
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
+          loadUserProfile();
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -577,8 +599,10 @@ class _HomeScreenState extends State<HomeScreen> {
       onEnter: (_) => setState(() => isProfileHovered = true),
       onExit: (_) => setState(() => isProfileHovered = false),
       child: GestureDetector(
-        onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+        onTap: () async {
+          // 🔥 SYNC COIN: Refresh data setelah kembali dari halaman Profil/Kelola User
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+          loadUserProfile();
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),

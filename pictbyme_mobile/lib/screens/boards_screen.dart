@@ -86,7 +86,6 @@ class _BoardsScreenState extends State<BoardsScreen> {
                   )
                 : LayoutBuilder(builder: (context, constraints) {
                     final width = constraints.maxWidth;
-                    // Menentukan jumlah kolom responsif (2 kol untuk mobile, up to 5 untuk desktop/web layar lebar)
                     final crossAxisCount = (width / 240).floor().clamp(2, 5);
 
                     return GridView.builder(
@@ -103,34 +102,42 @@ class _BoardsScreenState extends State<BoardsScreen> {
                         final board = boards[index];
                         final List innerPins = board['pins'] ?? []; 
 
+                        // 🔥 AMBIL TOTAL PIN ASLI DARI BACKEND COUNTER
+                        // Mendukung key 'pins_count' atau 'total_pins'. Jika null, baru pakai panjang array.
+                        final int totalPins = board['pins_count'] ?? board['total_pins'] ?? innerPins.length;
+
                         return GestureDetector(
                           onTap: () async {
                             try {
                               final resp = await apiService.getBoardDetail(board['id']);
                               if (!context.mounted) return;
+                              
                               if (resp.statusCode == 200 && resp.data != null) {
                                 final b = resp.data['data'];
-                                Navigator.push(
+                                // 🔥 Ditambahkan `await` agar mendengarkan ketika user kembali dari halaman detail
+                                await Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => BoardDetailScreen(board: b)),
                                 );
                               } else {
-                                Navigator.push(
+                                await Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => BoardDetailScreen(board: board)),
                                 );
                               }
                             } catch (e) {
-                              Navigator.push(
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (_) => BoardDetailScreen(board: board)),
                               );
                             }
+                            
+                            // 🔥 REFRESH DATA setelah kembali dari halaman detail (siapa tahu ada foto didelete di dalam)
+                            loadBoards();
                           },
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // --- RANGKA KARTU KOLASE UTAMA ---
                               Expanded(
                                 child: Container(
                                   decoration: BoxDecoration(
@@ -151,7 +158,6 @@ class _BoardsScreenState extends State<BoardsScreen> {
                                 ),
                               ),
                               
-                              // --- INFORMASI TEKS ALBUM ---
                               Padding(
                                 padding: const EdgeInsets.only(top: 10, left: 6, right: 6),
                                 child: Column(
@@ -168,8 +174,10 @@ class _BoardsScreenState extends State<BoardsScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 2),
+                                    
+                                    // 🔥 UPDATE: Menampilkan total pins yang akurat
                                     Text(
-                                      '${innerPins.length} Foto Simpanan',
+                                      '$totalPins Foto Simpanan',
                                       style: TextStyle(
                                         color: Colors.grey[500],
                                         fontSize: 12,
@@ -263,13 +271,11 @@ class _BoardsScreenState extends State<BoardsScreen> {
       ),
     );
 
-    // Reload dipicu di sini (pada parent scope) setelah dialog memberikan sinyal sukses (true)
     if (result == true) {
       await loadBoards();
     }
   }
 
-  // CORE LOGIC: Builder Pembuat Potongan Kolase Foto Otomatis Berdasarkan Jumlah Pins
   Widget _buildGalleryCollage(List pins) {
     if (pins.isEmpty) {
       return Container(

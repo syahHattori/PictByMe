@@ -23,45 +23,62 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   @override
   void initState() {
     super.initState();
+    _syncUserProfileCoin(); // 🔥 Ambil data koin paling fresh dari database backend
     _loadPaidPins();
   }
 
- Future<void> _loadPaidPins() async {
-  try {
-    final resp = await api.getPinsFiltered(paid: true);
-final purchased = await api.getPurchasedPins();
-    print("API RESPONSE:");
-    print(resp.data);
+  // 🔥 CORE FIX: Sinkronisasi saldo koin langsung dari API Profile Backend
+  Future<void> _syncUserProfileCoin() async {
+    try {
+      final resp = await api.getProfile(); 
+      if (resp.data != null && resp.data['user'] != null) {
+        final userData = resp.data['user'];
+        final rawCoins = userData['coins'] ?? userData['coin'] ?? userData['balance'];
+        
+        if (rawCoins != null) {
+          int coinValue = 0;
+          if (rawCoins is int) coinValue = rawCoins;
+          else if (rawCoins is double) coinValue = rawCoins.toInt();
+          else if (rawCoins is String) coinValue = int.tryParse(rawCoins) ?? 0;
 
-    final all = resp.data['data'] as List<dynamic>;
-    final purchasedIds = (purchased.data['data'] as List)
-    .map((e) => e['id'])
-    .toSet();
-
-    print("TOTAL DATA: ${all.length}");
-
-    setState(() {
-      paidPins = all.where((p) {
-        print(
-          "${p['title']} | price=${p['price_coin']} | premium=${p['is_premium']}"
-        );
-
-        final price = int.tryParse(
-          p['price_coin'].toString(),
-        ) ?? 0;
-
-       return price > 0 &&
-       !purchasedIds.contains(p['id']);
-      }).toList();
-
-      print("SHOWING: ${paidPins.length}");
-
-      isLoading = false;
-    });
-  } catch (e) {
-    print("MARKETPLACE ERROR: $e");
-    setState(() => isLoading = false);
+          // Set nilai koin global agar sinkron di setiap komponen halaman
+          CoinController().balance.value = coinValue;
+        }
+      }
+    } catch (e) {
+      debugPrint('MARKETPLACE SYNC COIN ERROR: $e');
+    }
   }
+
+  Future<void> _loadPaidPins() async {
+    try {
+      final resp = await api.getPinsFiltered(paid: true);
+      final purchased = await api.getPurchasedPins();
+      print("API RESPONSE:");
+      print(resp.data);
+
+      final all = resp.data['data'] as List<dynamic>;
+      final purchasedIds = (purchased.data['data'] as List)
+          .map((e) => e['id'])
+          .toSet();
+
+      print("TOTAL DATA: ${all.length}");
+
+      setState(() {
+        paidPins = all.where((p) {
+          print("${p['title']} | price=${p['price_coin']} | premium=${p['is_premium']}");
+
+          final price = int.tryParse(p['price_coin'].toString()) ?? 0;
+          return price > 0 && !purchasedIds.contains(p['id']);
+        }).toList();
+
+        print("SHOWING: ${paidPins.length}");
+        isLoading = false;
+      });
+    } catch (e) {
+      print("MARKETPLACE ERROR: $e");
+      setState(() => isLoading = false);
+    }
 
     // Fallback data tiruan jika backend kosong / lokal dev
     if (mounted && paidPins.isEmpty) {
@@ -108,14 +125,15 @@ final purchased = await api.getPurchasedPins();
         scrolledUnderElevation: 0,
         actions: [
           const SizedBox(width: 8),
-          // Menggunakan ValueListenableBuilder agar sinkron secara realtime di seluruh aplikasi
           MouseRegion(
             cursor: SystemMouseCursors.click,
             onEnter: (_) => setState(() => isCoinHovered = true),
             onExit: (_) => setState(() => isCoinHovered = false),
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
+              onTap: () async {
+                // 🔥 SYNC COIN: Menunggu user kembali dari halaman Top Up untuk me-refresh koin
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
+                _syncUserProfileCoin();
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
@@ -171,7 +189,12 @@ final purchased = await api.getPurchasedPins();
                     onExit: (_) => setState(() => hoveredIndex = -1),
                     cursor: SystemMouseCursors.click,
                     child: GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin))),
+                      onTap: () async {
+                        // Jika user masuk detail lalu kembali, koin & pin tetap dicek kestabilannya
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin)));
+                        _syncUserProfileCoin();
+                        _loadPaidPins();
+                      },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 220),
                         curve: Curves.easeOutCubic,
@@ -217,7 +240,6 @@ final purchased = await api.getPurchasedPins();
                                     ),
                                   ),
 
-                                  // Label Harga di Pojok Atas (Hanya tampil di Desktop, di Mobile pindah ke bawah)
                                   if (!isMobile)
                                     Positioned(
                                       left: 10,
@@ -227,7 +249,6 @@ final purchased = await api.getPurchasedPins();
                                         decoration: BoxDecoration(
                                           color: Colors.white.withOpacity(0.9),
                                           borderRadius: BorderRadius.circular(10),
-                                         
                                         ),
                                         child: Row(
                                           children: [
@@ -241,7 +262,6 @@ final purchased = await api.getPurchasedPins();
                                       ),
                                     ),
 
-                                  // Overlay Efek Hover (Hanya diaktifkan untuk Desktop Browser)
                                   if (!isMobile)
                                     Positioned.fill(
                                       child: AnimatedOpacity(
@@ -269,7 +289,6 @@ final purchased = await api.getPurchasedPins();
                                 ],
                               ),
                               
-                              // AREA FOOTER RESPONSIVE (Sangat krusial untuk kenyamanan pengguna HP/Tablet)
                               if (isMobile)
                                 Padding(
                                   padding: const EdgeInsets.all(12.0),
@@ -299,7 +318,6 @@ final purchased = await api.getPurchasedPins();
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      // Tombol Beli Langsung yang mudah diketuk jari di HP
                                       IconButton.filled(
                                         style: IconButton.styleFrom(backgroundColor: cs.primary),
                                         onPressed: () => _buyPin(pin),
@@ -325,17 +343,19 @@ final purchased = await api.getPurchasedPins();
     try {
       final resp = await api.purchasePin(pinId: id);
       debugPrint("PURCHASE STATUS = ${resp.statusCode}");
-
-debugPrint("PURCHASE DATA = ${resp.data}");
+      debugPrint("PURCHASE DATA = ${resp.data}");
       final data = resp.data;
+      
       if (data['success'] == true) {
         final prefs = await SharedPreferences.getInstance();
         final balance = data['data']?['balance'] ?? prefs.getInt('coin_balance') ?? 0;
         await prefs.setInt('coin_balance', balance);
         
-        // Memperbarui balance global agar UI di screen lain (seperti HomeScreen) langsung ikut berubah
         await CoinController().setBalance(balance);
         
+        // 🔥 REFRESH MARKETPLACE LIST: Setelah beli sukses, panggil ulang agar item yang dibeli hilang dari toko
+        _loadPaidPins();
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(data['message'] ?? 'Purchase successful ✨'), backgroundColor: Colors.green),
