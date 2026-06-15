@@ -59,7 +59,7 @@ class ApiService {
   Future<Response> getProfile() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-
+debugPrint("PROFILE TOKEN = $token");
     return await dio.get(
       '/profile',
       options: Options(

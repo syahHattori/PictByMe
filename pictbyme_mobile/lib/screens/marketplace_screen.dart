@@ -324,6 +324,9 @@ final purchased = await api.getPurchasedPins();
     final id = pin['id'];
     try {
       final resp = await api.purchasePin(pinId: id);
+      debugPrint("PURCHASE STATUS = ${resp.statusCode}");
+
+debugPrint("PURCHASE DATA = ${resp.data}");
       final data = resp.data;
       if (data['success'] == true) {
         final prefs = await SharedPreferences.getInstance();

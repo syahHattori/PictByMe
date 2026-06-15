@@ -49,204 +49,277 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
     return dateStr;
   }
 
-  // --- 2. FUNGSI UTAMA BUILD (PERBAIKAN ERROR) ---
+  // --- 2. FUNGSI UTAMA BUILD ---
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 800;
+    
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFF8FAFC), // Latar belakang Slate modern
       appBar: AppBar(
-        title: const Text('Admin Transactions', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Riwayat Transaksi',
+          style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.5),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF334155)),
       ),
       body: loading
-          ? const Center(child: CircularProgressIndicator(color: Colors.black87))
-          : Column(
-              children: [
-                // --- KARTU RINGKASAN DATA (METRICS) ---
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildMetricCard(
-                          title: 'Total Transaksi',
-                          value: '${purchases.length}',
-                          icon: Icons.receipt_long_rounded,
-                          color: Colors.blue.shade700,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildMetricCard(
-                          title: 'Koin Berputar',
-                          value: '🪙 $totalCoinsTransacted',
-                          icon: Icons.monetization_on_rounded,
-                          color: Colors.amber.shade800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // --- DAFTAR RIWAYAT TRANSAKSI ---
-                Expanded(
-                  child: purchases.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.payment_rounded, size: 64, color: Colors.grey[300]),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Belum ada transaksi terenkripsi',
-                                style: TextStyle(color: Colors.grey[500], fontSize: 15),
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF0F172A),
+                strokeWidth: 3,
+              ),
+            )
+          : Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 1000), // Membatasi lebar layout di monitor lebar
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    // --- KARTU RINGKASAN DATA (METRICS) ADAPTIF ---
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        bool isCompact = constraints.maxWidth < 450;
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: _buildMetricCard(
+                                title: 'Total Transaksi',
+                                value: '${purchases.length}',
+                                icon: Icons.receipt_long_rounded,
+                                color: Colors.blueAccent,
+                                isCompact: isCompact,
                               ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isDesktop ? size.width * 0.15 : 16,
-                            vertical: 8,
-                          ),
-                          itemCount: purchases.length,
-                          itemBuilder: (context, i) {
-                            final trx = purchases[i];
-                            final buyerName = trx['buyer']?['username']?.toString() ?? '-';
-                            final pinTitle = trx['pin']?['title']?.toString() ?? 'Deleted Pin';
-                            final price = trx['price_coin'] ?? 0;
-                            final date = _formatDate(trx['created_at']);
-
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 6),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: BorderSide(color: Colors.grey.shade200, width: 1),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildMetricCard(
+                                title: 'Koin Berputar',
+                                value: '🪙 $totalCoinsTransacted',
+                                icon: Icons.monetization_on_rounded,
+                                color: Colors.amber.shade700,
+                                isCompact: isCompact,
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Avatar Pembeli
-                                    CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: Colors.black87,
-                                      child: Text(
-                                        buyerName[0].toUpperCase(),
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                      ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Subtitle Informasi
+                    const Text(
+                      'Log Aktivitas Pembelian Pin',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // --- DAFTAR RIWAYAT TRANSAKSI ---
+                    Expanded(
+                      child: purchases.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      shape: BoxShape.circle,
                                     ),
-                                    const SizedBox(width: 16),
-                                    
-                                    // Detail Transaksi
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            buyerName,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          RichText(
-                                            text: TextSpan(
-                                              text: 'Membeli ',
-                                              style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                                              children: [
-                                                TextSpan(
-                                                  text: '"$pinTitle"',
-                                                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
-                                                ),
-                                              ],
+                                    child: Icon(Icons.payment_rounded, size: 48, color: Colors.grey[400]),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    'Belum ada riwayat transaksi masuk',
+                                    style: TextStyle(color: Colors.grey[500], fontSize: 14, fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.only(bottom: 32, top: 4),
+                              itemCount: purchases.length,
+                              itemBuilder: (context, i) {
+                                final trx = purchases[i];
+                                final buyerName = trx['buyer']?['username']?.toString() ?? '-';
+                                final pinTitle = trx['pin']?['title']?.toString() ?? 'Konten Dihapus';
+                                final price = trx['price_coin'] ?? 0;
+                                final date = _formatDate(trx['created_at']);
+
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 6),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(color: Colors.grey.shade200, width: 1),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        // Avatar Pembeli Premium Look
+                                        CircleAvatar(
+                                          radius: 22,
+                                          backgroundColor: const Color(0xFF0F172A),
+                                          child: Text(
+                                            buyerName.isNotEmpty ? buyerName[0].toUpperCase() : '?',
+                                            style: const TextStyle(
+                                              color: Colors.white, 
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
                                             ),
                                           ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            date,
-                                            style: TextStyle(color: Colors.grey[400], fontSize: 11),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    
-                                    // Nilai Koin / Harga Pin
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.amber.shade50,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '🪙 $price',
-                                        style: TextStyle(
-                                          color: Colors.amber.shade900,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
                                         ),
-                                      ),
+                                        const SizedBox(width: 16),
+                                        
+                                        // Detail Informasi Transaksi
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                buyerName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w800, 
+                                                  fontSize: 15,
+                                                  color: Color(0xFF1E293B),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              RichText(
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                text: TextSpan(
+                                                  text: 'Membeli ',
+                                                  style: TextStyle(color: Colors.grey[600], fontSize: 13, fontFamily: 'Roboto'),
+                                                  children: [
+                                                    TextSpan(
+                                                      text: '"$pinTitle"',
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.w700, 
+                                                        color: Color(0xFF0F172A),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.calendar_today_rounded, size: 11, color: Colors.grey[400]),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    date,
+                                                    style: TextStyle(color: Colors.grey[500], fontSize: 11, fontWeight: FontWeight.w500),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        
+                                        // Badge Harga Koin Bergaya Modern
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.shade50,
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.amber.shade100, width: 1),
+                                          ),
+                                          child: Text(
+                                            '🪙 $price',
+                                            style: TextStyle(
+                                              color: Colors.amber.shade900,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
     );
   }
 
-  // --- KOMPONEN METRIC CARD ---
+  // --- KOMPONEN METRIC CARD MODERN ---
   Widget _buildMetricCard({
     required String title,
     required String value,
     required IconData icon,
     required Color color,
+    required bool isCompact,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isCompact ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.02), // FIX: Menggunakan standar .withValues terkini
+            blurRadius: 12,
             offset: const Offset(0, 4),
           )
         ],
+        border: Border.all(color: Colors.grey.shade100),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(isCompact ? 8 : 12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withValues(alpha: 0.08), // FIX: Menggunakan standar .withValues terkini
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: color, size: isCompact ? 20 : 26),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: isCompact ? 10 : 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  title,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 4),
-                Text(
                   value,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: isCompact ? 16 : 20, 
+                    fontWeight: FontWeight.w800, 
+                    color: const Color(0xFF1E293B),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: const Color(0xFF64748B), 
+                    fontSize: isCompact ? 11 : 12, 
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

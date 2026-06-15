@@ -29,29 +29,58 @@ class _HomeScreenState extends State<HomeScreen> {
   final ApiService apiService = ApiService();
   List pins = [];
   bool isLoading = true;
+  String? profilePicUrl;
 
   @override
   void initState() {
     super.initState();
     loadPins();
     loadUnreadNotifications();
+    loadUserProfile(); 
+  }
+
+  // 👤 Mengambil data profil user (Sudah disesuaikan dengan response backend)
+  Future<void> loadUserProfile() async {
+    try {
+      final resp = await apiService.getProfile(); 
+      setState(() {
+        profilePicUrl = resp.data['user']['profile_picture']?.toString();
+      });
+      print("HASIL URL FOTO SEKARANG: $profilePicUrl");
+    } catch (e) {
+      print('LOAD USER PROFILE ERROR: $e');
+    }
+  }
+
+  // 🔔 Mengambil jumlah notifikasi yang belum dibaca (Dibuat fleksibel terhadap struktur objek)
+  Future<void> loadUnreadNotifications() async {
+    try {
+      final resp = await apiService.getUnreadNotificationCount();
+      
+      print("====== DEBUG NOTIF RESP ======");
+      print(resp.data);
+      print("==============================");
+
+      setState(() {
+        // Otomatis membaca dari resp.data['count'] atau resp.data['data']['count']
+        unreadNotificationCount = resp.data['count'] ?? resp.data['data']?['count'] ?? 0;
+      });
+    } catch (e) {
+      debugPrint('NOTIFICATION ERROR: $e');
+    }
   }
 
   Future<void> loadPins() async {
     try {
       final response = await apiService.getPins();
-
-      // Memfilter pin gratis saja untuk halaman Home Feed
       final all = response.data['data'] as List<dynamic>;
       final visible = all.where((p) {
-        // Normalisasi price_coin (int, double, atau string)
         int price = 0;
         final pc = p['price_coin'];
         if (pc is int) price = pc;
         else if (pc is double) price = pc.toInt();
         else if (pc is String) price = int.tryParse(pc) ?? 0;
 
-        // Normalisasi is_premium (bool, int 0/1, atau string)
         var ip = p['is_premium'];
         bool isPremium = false;
         if (ip is bool) isPremium = ip;
@@ -71,17 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
   }
-Future<void> loadUnreadNotifications() async {
-  try {
-    final resp = await apiService.getUnreadNotificationCount();
 
-    setState(() {
-      unreadNotificationCount = resp.data['count'] ?? 0;
-    });
-  } catch (e) {
-    debugPrint('NOTIFICATION ERROR: $e');
-  }
-}
   Future<void> _showSaveToBoardDialog(Map pin) async {
     try {
       final resp = await apiService.getBoards();
@@ -160,15 +179,11 @@ Future<void> loadUnreadNotifications() async {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
-    // Deteksi resolusi layar device
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 800;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      
-      // DRAWER RESPONSIVE: Hanya muncul di versi Mobile untuk menggantikan Sidebar kaku
       drawer: isMobile
           ? Drawer(
               child: Column(
@@ -245,7 +260,6 @@ Future<void> loadUnreadNotifications() async {
           
       body: Row(
         children: [
-          // --- SIDEBAR UTAMA DESKTOP --- (Hanya dirender jika BUKAN di device mobile)
           if (!isMobile)
             Container(
               width: 90,
@@ -306,12 +320,9 @@ Future<void> loadUnreadNotifications() async {
               ),
             ),
 
-          // --- AREA CONTENT UTAMA ---
           Expanded(
             child: Column(
               children: [
-                
-                // TOP BAR RESPONSIVE (Mencegah overflow komponen di HP)
                 Container(
                   padding: EdgeInsets.all(isMobile ? 12 : 20),
                   color: Colors.white,
@@ -320,7 +331,6 @@ Future<void> loadUnreadNotifications() async {
                           children: [
                             Row(
                               children: [
-                                // Tombol Hamburger pembuka Drawer di Mobile
                                 Builder(
                                   builder: (scaffoldContext) => IconButton(
                                     icon: const Icon(Icons.menu, color: Colors.black87, size: 26),
@@ -341,11 +351,10 @@ Future<void> loadUnreadNotifications() async {
                                 const SizedBox(width: 10),
                                 _buildCoinButton(colorScheme),
                                 const SizedBox(width: 10),
-                                _buildProfileAvatar(colorScheme),
+                                _buildProfileAvatar(colorScheme), 
                               ],
                             ),
                             const SizedBox(height: 10),
-                            // Kolom Search diletakkan di baris kedua khusus untuk Mobile
                             _buildSearchTextField(),
                           ],
                         )
@@ -357,12 +366,11 @@ Future<void> loadUnreadNotifications() async {
                             const SizedBox(width: 20),
                             _buildCoinButton(colorScheme),
                             const SizedBox(width: 20),
-                            _buildProfileAvatar(colorScheme),
+                            _buildProfileAvatar(colorScheme), 
                           ],
                         ),
                 ),
 
-                // MASONRY PHOTO GRID
                 Expanded(
                   child: isLoading
                       ? const Center(child: CircularProgressIndicator(color: Colors.black87))
@@ -458,7 +466,6 @@ Future<void> loadUnreadNotifications() async {
     );
   }
 
-  // Helper Pembuat Search Bar
   Widget _buildSearchTextField() {
     return TextField(
       decoration: InputDecoration(
@@ -472,74 +479,70 @@ Future<void> loadUnreadNotifications() async {
     );
   }
 
-  // Helper Pembuat Tombol Notifikasi
+  // 🔴 UPDATE: Desain tombol notifikasi beserta bintik merah dinamis
   Widget _buildNotificationButton(ColorScheme colorScheme) {
-  return MouseRegion(
-    cursor: SystemMouseCursors.click,
-    onEnter: (_) => setState(() => isNotificationHovered = true),
-    onExit: (_) => setState(() => isNotificationHovered = false),
-    child: GestureDetector(
-      onTap: () async {
-        try {
-          await apiService.markNotificationsRead();
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => isNotificationHovered = true),
+      onExit: (_) => setState(() => isNotificationHovered = false),
+      child: GestureDetector(
+        onTap: () async {
+          try {
+            await apiService.markNotificationsRead();
+            setState(() {
+              unreadNotificationCount = 0;
+            });
+          } catch (_) {}
 
-          setState(() {
-            unreadNotificationCount = 0;
-          });
-        } catch (_) {}
+          if (!mounted) return;
 
-        if (!mounted) return;
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const NotificationsScreen(),
-          ),
-        );
-      },
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            padding: const EdgeInsets.all(8),
-            transform: Matrix4.identity()
-              ..scale(isNotificationHovered ? 1.06 : 1.0),
-            decoration: BoxDecoration(
-              color: isNotificationHovered
-                  ? colorScheme.primary.withOpacity(0.08)
-                  : const Color(0xFFF1F3F5),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.notifications,
-              color: isNotificationHovered
-                  ? colorScheme.primary
-                  : Colors.black54,
-              size: 20,
-            ),
-          ),
-
-          if (unreadNotificationCount > 0)
-            Positioned(
-              right: -2,
-              top: -2,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          );
+        },
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none, 
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              padding: const EdgeInsets.all(9),
+              transform: Matrix4.identity()..scale(isNotificationHovered ? 1.06 : 1.0),
+              decoration: BoxDecoration(
+                color: isNotificationHovered
+                    ? colorScheme.primary.withOpacity(0.08)
+                    : const Color(0xFFF1F3F5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.notifications,
+                color: isNotificationHovered ? colorScheme.primary : Colors.black54,
+                size: 22,
               ),
             ),
-        ],
+            
+            // INDIKATOR BINTIK MERAH NOTIFIKASI BARU
+            if (unreadNotificationCount > 0)
+              Positioned(
+                top: 2,
+                right: 2,
+                child: Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5), 
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-  // Helper Pembuat Tombol Saldo Koin
   Widget _buildCoinButton(ColorScheme colorScheme) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -568,7 +571,6 @@ Future<void> loadUnreadNotifications() async {
     );
   }
 
-  // Helper Pembuat Avatar Profil
   Widget _buildProfileAvatar(ColorScheme colorScheme) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -585,17 +587,30 @@ Future<void> loadUnreadNotifications() async {
             shape: BoxShape.circle,
             border: Border.all(color: isProfileHovered ? colorScheme.primary : Colors.transparent, width: 2),
           ),
-          child: CircleAvatar(
-            radius: 18,
-            backgroundColor: Colors.grey[200],
-            child: Icon(Icons.person, size: 20, color: isProfileHovered ? colorScheme.primary : Colors.black54),
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: ClipOval(
+              child: profilePicUrl != null && profilePicUrl!.isNotEmpty
+                  ? Image.network(
+                      profilePicUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[200],
+                        child: Icon(Icons.person, size: 20, color: isProfileHovered ? colorScheme.primary : Colors.black54),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.grey[200],
+                      child: Icon(Icons.person, size: 20, color: isProfileHovered ? colorScheme.primary : Colors.black54),
+                    ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Helper Pembuat Item Sidebar Efek Hover
   Widget _buildSidebarItem({required IconData icon, required int index, required ColorScheme colorScheme, required VoidCallback onTap}) {
     final isSelected = hoveredSidebarIndex == index;
     return MouseRegion(
@@ -618,10 +633,6 @@ Future<void> loadUnreadNotifications() async {
     );
   }
 
-  // Helper Pembuat Tombol Topbar Efek Hover
-
-
-  // Tampilan ketika data feeds kosong
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
