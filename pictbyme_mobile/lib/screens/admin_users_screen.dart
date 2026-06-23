@@ -23,7 +23,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   @override
   void dispose() {
-    // 🔥 Mencegah memory leak saat screen ditutup
     searchController.dispose();
     super.dispose();
   }
@@ -68,7 +67,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final double screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Konsisten dengan tema PictByMe
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text(
           "Kelola Pengguna",
@@ -88,7 +87,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Center(
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 800), // Batas lebar di Desktop
+                      constraints: const BoxConstraints(maxWidth: 800),
                       child: TextField(
                         controller: searchController,
                         onChanged: filterUsers,
@@ -123,13 +122,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       ? _buildEmptyState()
                       : Center(
                           child: Container(
-                            constraints: const BoxConstraints(maxWidth: 1400), // Agar di monitor ultra-wide tidak terlalu melar
+                            constraints: const BoxConstraints(maxWidth: 1400),
                             child: GridView.builder(
                               padding: const EdgeInsets.all(16),
-                              // Grid dinamis: otomatis menghitung kolom berdasarkan lebar layar device
                               gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                                 maxCrossAxisExtent: screenWidth < 600 ? screenWidth : 460, 
-                                mainAxisExtent: 135, // Tinggi ideal isi kartu user
+                                mainAxisExtent: 110, // Disesuaikan tingginya karena info koin sudah dihapus
                                 crossAxisSpacing: 14,
                                 mainAxisSpacing: 14,
                               ),
@@ -155,7 +153,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                     child: Padding(
                                       padding: const EdgeInsets.all(12.0),
                                       child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.center, // Pusatkan secara vertikal
                                         children: [
                                           // Avatar Profil Dinamis
                                           _buildUserAvatar(avatarUrl, name, username, colorScheme),
@@ -165,6 +163,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
                                                 Row(
                                                   children: [
@@ -190,6 +189,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                       ),
                                                   ],
                                                 ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  name,
+                                                  style: const TextStyle(color: Colors.black54, fontSize: 13),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                                 const SizedBox(height: 2),
                                                 Text(
                                                   email,
@@ -197,47 +203,27 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
-                                                const Spacer(),
-                                                // Informasi Koin Bergaya Minimalis
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.amber.shade50,
-                                                    borderRadius: BorderRadius.circular(20),
-                                                  ),
-                                                  child: Text(
-                                                    "🪙 ${user['coin_balance'] ?? 0} Coins",
-                                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.amber.shade900),
-                                                  ),
-                                                ),
                                               ],
                                             ),
                                           ),
                                           
-                                          // Kolom Aksi / Tombol Kontrol Administrasi
-                                          Column(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          // Kolom Aksi Kontrol Administrasi (Hanya Reset & Hapus)
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
                                               IconButton(
-                                                icon: const Icon(Icons.edit_rounded, color: Colors.blue, size: 20),
-                                                tooltip: 'Edit Koin',
-                                                onPressed: () => _editCoins(user),
-                                                constraints: const BoxConstraints(),
-                                                padding: const EdgeInsets.all(4),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(Icons.lock_reset_rounded, color: Colors.orange, size: 20),
+                                                icon: const Icon(Icons.lock_reset_rounded, color: Colors.orange, size: 22),
                                                 tooltip: 'Reset Password',
                                                 onPressed: () => _resetPassword(user),
                                                 constraints: const BoxConstraints(),
-                                                padding: const EdgeInsets.all(4),
+                                                padding: const EdgeInsets.all(8),
                                               ),
                                               IconButton(
-                                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 22),
                                                 tooltip: 'Hapus User',
                                                 onPressed: () => _deleteUser(user),
                                                 constraints: const BoxConstraints(),
-                                                padding: const EdgeInsets.all(4),
+                                                padding: const EdgeInsets.all(8),
                                               ),
                                             ],
                                           )
@@ -256,13 +242,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
 
-  // Helper Widget: Pembuat Avatar Bulat dengan penanganan Error Gambar Lengkap
   Widget _buildUserAvatar(String url, String name, String username, ColorScheme colorScheme) {
     final String initial = (name.isNotEmpty ? name[0] : (username.isNotEmpty ? username[0] : '?')).toUpperCase();
     
     return SizedBox(
-      width: 46,
-      height: 46,
+      width: 48,
+      height: 48,
       child: ClipOval(
         child: url.isNotEmpty
             ? Image.network(
@@ -298,41 +283,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         ],
       ),
     );
-  }
-
-  // --- OVERHAUL DIALOGS (DIUBAH MENJADI LEBIH CANTIK & MODEREN) ---
-
-  Future<void> _editCoins(dynamic user) async {
-    final controller = TextEditingController(text: user['coin_balance'].toString());
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Edit Koin @${user['username']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Jumlah Koin Baru',
-            prefixIcon: const Icon(Icons.monetization_on, color: Colors.amber),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      await api.updateUserCoins(userId: user['id'], coins: int.tryParse(controller.text) ?? 0);
-      loadUsers();
-    }
   }
 
   Future<void> _resetPassword(dynamic user) async {
@@ -421,7 +371,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             _buildDetailRow('Nama Lengkap', user['name'] ?? '-'),
             _buildDetailRow('Alamat Email', user['email'] ?? '-'),
             _buildDetailRow('Hak Akses / Role', (user['role'] ?? 'user').toString().toUpperCase()),
-            _buildDetailRow('Saldo Koin', '🪙 ${user['coin_balance'] ?? 0}'),
             _buildDetailRow('Tanggal Gabung', user['created_at']?.toString().split('T').first ?? '-'),
           ],
         ),

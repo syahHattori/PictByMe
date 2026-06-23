@@ -7,12 +7,11 @@ import 'create_pin_screen.dart';
 import 'profile_screen.dart';
 import 'notifications_screen.dart';
 import 'settings_screen.dart';
-import 'topup_screen.dart';
+import 'wallet_screen.dart'; 
 import 'marketplace_screen.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import '../services/coin_controller.dart';
+import '../services/balance_controller.dart';
 import 'my_pins_screen.dart';
-// 🔥 Import NotificationService telah dihapus karena beralih ke Polling
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,20 +22,20 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int hoveredIndex = -1;
-  bool isCoinHovered = false;
+  bool isBalanceHovered = false; 
   bool isProfileHovered = false;
   int hoveredSidebarIndex = -1;
   bool isNotificationHovered = false;
   int unreadNotificationCount = 0;
   final ApiService apiService = ApiService();
   
-  List pins = []; // Master data dari API
-  List filteredPins = []; // 🔥 Data hasil filter Live Search
+  List pins = []; 
+  List filteredPins = []; 
   
   bool isLoading = true;
   String? profilePicUrl;
-  StreamSubscription<Map<String, dynamic>>? _notificationSub; // Subskripsi realtime (idle)
-  Timer? _notificationTimer; // 🔥 Timer untuk periodic polling setiap 10 detik
+  StreamSubscription<Map<String, dynamic>>? _notificationSub; 
+  Timer? _notificationTimer; 
 
   @override
   void initState() {
@@ -45,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
     loadUnreadNotifications();
     loadUserProfile(); 
     
-    // 🔥 Mengganti realtime listener dengan Polling API setiap 10 detik
     _notificationTimer = Timer.periodic(
       const Duration(seconds: 10),
       (_) async {
@@ -57,12 +55,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _notificationTimer?.cancel(); // 🔥 Hentikan timer polling agar tidak memory leak
-    _notificationSub?.cancel(); // Bersihkan stream sisa jika ada
+    _notificationTimer?.cancel(); 
+    _notificationSub?.cancel(); 
     super.dispose();
   }
 
-  // 👤 Mengambil data profil & menyinkronkan saldo koin global dengan database
+  // Helper format rupiah
+  String _formatRupiah(int number) {
+    return number.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
+      (Match m) => '${m[1]}.'
+    );
+  }
+
   Future<void> loadUserProfile() async {
     try {
       final resp = await apiService.getProfile(); 
@@ -73,14 +78,15 @@ class _HomeScreenState extends State<HomeScreen> {
           profilePicUrl = userData['profile_picture']?.toString();
         });
 
-        final rawCoins = userData['coin_balance'] ?? userData['coins'] ?? userData['coin'] ?? userData['balance'];
-        if (rawCoins != null) {
-          int coinValue = 0;
-          if (rawCoins is int) coinValue = rawCoins;
-          else if (rawCoins is double) coinValue = rawCoins.toInt();
-          else if (rawCoins is String) coinValue = int.tryParse(rawCoins) ?? 0;
-
-          CoinController().balance.value = coinValue;
+        // 🔥 AMBIL SALDO ONOPAY REALTIME (Menggantikan koin)
+        final phone = userData['onopay_phone'];
+        if (phone != null && phone.toString().isNotEmpty) {
+          final balanceResp = await apiService.getOnoPayBalance();
+          final currentBal = balanceResp.data['data']['balance'] ?? 0;
+          
+        BalanceController().balance.value = currentBal; 
+        } else {
+          BalanceController().balance.value = 0;
         }
       }
     } catch (e) {
@@ -88,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 🔔 Mengambil jumlah notifikasi yang belum dibaca
   Future<void> loadUnreadNotifications() async {
     try {
       final resp = await apiService.getUnreadNotificationCount();
@@ -122,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         pins = visible;
-        filteredPins = visible; // 🔥 Sinkronkan penampung pencarian di awal
+        filteredPins = visible; 
         isLoading = false;
       });
     } catch (e) {
@@ -132,7 +137,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 🔥 LOGIKA LIVE SEARCH (Filter Judul, Deskripsi, dan Kategori)
   void _filterPins(String query) {
     if (query.isEmpty) {
       setState(() {
@@ -145,7 +149,6 @@ class _HomeScreenState extends State<HomeScreen> {
           final title = (pin['title'] ?? '').toString().toLowerCase();
           final description = (pin['description'] ?? '').toString().toLowerCase();
           
-          // Mengamankan pembacaan data kategori baik bertipe String maupun Map Object
           String categoryStr = '';
           if (pin['category'] != null) {
             if (pin['category'] is Map) {
@@ -360,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const Spacer(),
                                 _buildNotificationButton(colorScheme),
                                 const SizedBox(width: 10),
-                                _buildCoinButton(colorScheme),
+                                _buildBalanceButton(colorScheme), 
                                 const SizedBox(width: 10),
                                 _buildProfileAvatar(colorScheme), 
                               ],
@@ -375,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(width: 20),
                             _buildNotificationButton(colorScheme),
                             const SizedBox(width: 20),
-                            _buildCoinButton(colorScheme),
+                            _buildBalanceButton(colorScheme), 
                             const SizedBox(width: 20),
                             _buildProfileAvatar(colorScheme), 
                           ],
@@ -551,29 +554,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCoinButton(ColorScheme colorScheme) {
+  // 🔥 DIKEMBALIKAN KE DESAIN AWAL (Solid Primary Color), hanya ubah format textnya
+  Widget _buildBalanceButton(ColorScheme colorScheme) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => isCoinHovered = true),
-      onExit: (_) => setState(() => isCoinHovered = false),
+      onEnter: (_) => setState(() => isBalanceHovered = true), 
+      onExit: (_) => setState(() => isBalanceHovered = false), 
       child: GestureDetector(
         onTap: () async {
-          await Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
+          await Navigator.push(
+            context, 
+            MaterialPageRoute(builder: (_) => const WalletScreen())
+          );
           loadUserProfile();
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
-          transform: Matrix4.identity()..scale(isCoinHovered ? 1.03 : 1.0),
+          transform: Matrix4.identity()..scale(isBalanceHovered ? 1.03 : 1.0), 
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isCoinHovered ? colorScheme.primary.withOpacity(0.9) : colorScheme.primary,
+            color: isBalanceHovered ? colorScheme.primary.withOpacity(0.9) : colorScheme.primary, 
             borderRadius: BorderRadius.circular(30),
-            boxShadow: isCoinHovered ? [const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))] : null,
+            boxShadow: isBalanceHovered ? [const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))] : null, 
           ),
           child: ValueListenableBuilder<int>(
-            valueListenable: CoinController().balance,
-            builder: (context, value, _) => Text('🪙 $value', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+            valueListenable: BalanceController().balance,
+            builder: (context, value, _) => Text(
+              'Rp ${_formatRupiah(value)}', 
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
+            ),
           ),
         ),
       ),
@@ -631,62 +641,33 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.all(10),
-          transform: Matrix4.identity()..scale(isSelected ? 1.06 : 1.0),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isSelected ? colorScheme.primary.withOpacity(0.08) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(icon, color: isSelected ? colorScheme.primary : Colors.black45, size: 24),
+          child: Icon(
+            icon,
+            color: isSelected ? colorScheme.primary : Colors.black54,
+            size: 24,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState({bool isSearchEmpty = false}) {
+  Widget _buildEmptyState({required bool isSearchEmpty}) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(36.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSearchEmpty ? Icons.search_off_rounded : Icons.photo_library_outlined, 
-              size: 72, 
-              color: Colors.grey,
-            ),
-            const SizedBox(height: 18),
-            Text(
-              isSearchEmpty ? 'Hasil tidak ditemukan' : 'Belum ada Pin gratis saat ini', 
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isSearchEmpty 
-                  ? 'Coba gunakan kata kunci pencarian yang lain.' 
-                  : 'Sebagian pin mungkin berbayar dan tersedia di Marketplace. Jelajahi Marketplace atau buat pin baru.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 18),
-            if (!isSearchEmpty)
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                alignment: WrapAlignment.center,
-                children: [
-                  ElevatedButton(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
-                    child: const Text('Buka Marketplace'),
-                  ),
-                  OutlinedButton(
-                    onPressed: goToCreatePin,
-                    child: const Text('Buat Pin Baru'),
-                  ),
-                ],
-              ),
-          ],
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.photo_library_outlined, size: 60, color: Colors.grey.shade400),
+          const SizedBox(height: 15),
+          Text(
+            isSearchEmpty ? 'Tidak ada hasil yang cocok' : 'Belum ada foto yang tersedia',
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }

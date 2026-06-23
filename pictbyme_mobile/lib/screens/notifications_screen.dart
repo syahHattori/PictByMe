@@ -57,7 +57,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Expanded(child: Text(message, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white))),
           ],
         ),
-        backgroundColor: const Color(0xFF212121), // 🔥 FIX: Mengganti Colors.blackEE yang tidak valid
+        backgroundColor: const Color(0xFF212121),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
@@ -93,13 +93,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         'badgeColor': Colors.pink.shade400,
         'gradient': LinearGradient(colors: [Colors.pink.shade50, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
       };
-    } else if (iconType == 'monetization_on' || msgLower.contains('beli') || msgLower.contains('purchase') || msgLower.contains('koin')) {
+    // Mengganti deteksi koin dengan pembayaran / OnoPay dan mengubah UI-nya menjadi hijau
+    } else if (iconType == 'monetization_on' || iconType == 'account_balance_wallet' || msgLower.contains('beli') || msgLower.contains('purchase') || msgLower.contains('bayar')) {
       return {
-        'icon': Icons.monetization_on_rounded,
-        'iconColor': Colors.amber.shade800,
-        'bgColor': Colors.amber.shade50,
-        'badgeColor': Colors.amber.shade600,
-        'gradient': LinearGradient(colors: [Colors.amber.shade50, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        'icon': Icons.account_balance_wallet_rounded,
+        'iconColor': Colors.green.shade600,
+        'bgColor': Colors.green.shade50,
+        'badgeColor': Colors.green.shade600,
+        'gradient': LinearGradient(colors: [Colors.green.shade50, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
       };
     } else if (msgLower.contains('komentar') || msgLower.contains('comment') || msgLower.contains('membalas')) {
       return {
@@ -132,13 +133,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
-            Icon(Icons.auto_awesome, color: Colors.amber, size: 20), // 🔥 FIX: Mengganti Icons.sparkles ke Icons.auto_awesome
+            Icon(Icons.auto_awesome, color: Colors.amber, size: 20),
             SizedBox(width: 8),
             Text(
               'Notifikasi',
               style: TextStyle(
                 color: Colors.black87, 
-                fontWeight: FontWeight.w900, // 🔥 FIX: Mengganti FontWeight.black ke FontWeight.w900
+                fontWeight: FontWeight.w900,
                 fontSize: 19, 
                 letterSpacing: -0.5
               ),
@@ -259,7 +260,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     children: [
                                       TextSpan(
                                         text: '$username ',
-                                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black), // 🔥 FIX: FontWeight.black ke FontWeight.w900
+                                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black), 
                                       ),
                                       TextSpan(
                                         text: message,

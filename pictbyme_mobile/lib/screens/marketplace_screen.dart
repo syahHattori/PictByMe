@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'topup_screen.dart';
-import '../services/coin_controller.dart';
+
+
+import '../services/balance_controller.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../services/api_service.dart';
 import 'pin_detail_screen.dart';
@@ -23,56 +23,65 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   @override
   void initState() {
     super.initState();
-    _syncUserProfileCoin(); // 🔥 Ambil data koin paling fresh dari database backend
+    _syncUserProfileCoin(); 
     _loadPaidPins();
   }
 
-  // 🔥 CORE FIX: Sinkronisasi saldo koin langsung dari API Profile Backend
+  // 🔥 CORE FIX: Mengubah parameter menjadi dynamic agar aman jika menerima String dari API
+  String _formatRupiah(dynamic value) {
+    int number = 0;
+    if (value is int) {
+      number = value;
+    } else if (value is double) {
+      number = value.toInt();
+    } else if (value is String) {
+      number = int.tryParse(value) ?? 0;
+    }
+
+    return number.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
+      (Match m) => '${m[1]}.'
+    );
+  }
+
   Future<void> _syncUserProfileCoin() async {
     try {
       final resp = await api.getProfile(); 
       if (resp.data != null && resp.data['user'] != null) {
         final userData = resp.data['user'];
-        final rawCoins = userData['coins'] ?? userData['coin'] ?? userData['balance'];
+        final phone = userData['onopay_phone'];
         
-        if (rawCoins != null) {
-          int coinValue = 0;
-          if (rawCoins is int) coinValue = rawCoins;
-          else if (rawCoins is double) coinValue = rawCoins.toInt();
-          else if (rawCoins is String) coinValue = int.tryParse(rawCoins) ?? 0;
-
-          // Set nilai koin global agar sinkron di setiap komponen halaman
-          CoinController().balance.value = coinValue;
+        if (phone != null && phone.toString().isNotEmpty) {
+          final balanceResp = await api.getOnoPayBalance();
+          final currentBal = balanceResp.data['data']['balance'] ?? 0;
+          
+          // Konversi aman sebelum dimasukkan ke controller
+         BalanceController().balance.value = int.tryParse(currentBal.toString()) ?? 0;
+        } else {
+        BalanceController().balance.value = 0;
         }
       }
     } catch (e) {
-      debugPrint('MARKETPLACE SYNC COIN ERROR: $e');
+      debugPrint('MARKETPLACE SYNC ONOPAY ERROR: $e');
     }
   }
 
   Future<void> _loadPaidPins() async {
     try {
       final resp = await api.getPinsFiltered(paid: true);
-      final purchased = await api.getPurchasedPins();
-      print("API RESPONSE:");
-      print(resp.data);
+      final purchased = await api.getPurchasedPins(); 
 
       final all = resp.data['data'] as List<dynamic>;
       final purchasedIds = (purchased.data['data'] as List)
           .map((e) => e['id'])
           .toSet();
 
-      print("TOTAL DATA: ${all.length}");
-
       setState(() {
         paidPins = all.where((p) {
-          print("${p['title']} | price=${p['price_coin']} | premium=${p['is_premium']}");
-
           final price = int.tryParse(p['price_coin'].toString()) ?? 0;
           return price > 0 && !purchasedIds.contains(p['id']);
         }).toList();
 
-        print("SHOWING: ${paidPins.length}");
         isLoading = false;
       });
     } catch (e) {
@@ -80,28 +89,27 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       setState(() => isLoading = false);
     }
 
-    // Fallback data tiruan jika backend kosong / lokal dev
     if (mounted && paidPins.isEmpty) {
       setState(() {
         paidPins = [
           {
             'id': 1001,
             'file_url': 'https://images.unsplash.com/photo-1503023345310-bd7c1de61c7d?w=1200',
-            'price_coin': 1500,
+            'price_coin': 15000, 
             'title': 'Sunset Over Hills',
             'description': 'Beautiful sunset landscape',
           },
           {
             'id': 1002,
             'file_url': 'https://images.unsplash.com/photo-1495567720989-cebdbdd97913?w=1200',
-            'price_coin': 2500,
+            'price_coin': 25000,
             'title': 'City Lights',
             'description': 'Night city skyline',
           },
           {
             'id': 1003,
             'file_url': 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=1200',
-            'price_coin': 500,
+            'price_coin': 5000,
             'title': 'Forest Path',
             'description': 'Misty forest trail',
           },
@@ -131,8 +139,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             onExit: (_) => setState(() => isCoinHovered = false),
             child: GestureDetector(
               onTap: () async {
-                // 🔥 SYNC COIN: Menunggu user kembali dari halaman Top Up untuk me-refresh koin
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
+               // await Navigator.push(context, MaterialPageRoute(builder: (_) =>
                 _syncUserProfileCoin();
               },
               child: AnimatedContainer(
@@ -147,17 +154,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   boxShadow: isCoinHovered ? [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))] : null,
                 ),
                 child: ValueListenableBuilder<int>(
-                  valueListenable: CoinController().balance,
+                  valueListenable:BalanceController().balance,
                   builder: (context, value, _) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('🪙 ', style: TextStyle(fontSize: 14)),
-                        Text(
-                          '$value',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                    return Text(
+                      'Rp ${_formatRupiah(value)}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                     );
                   },
                 ),
@@ -180,7 +181,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 itemCount: paidPins.length,
                 itemBuilder: (context, index) {
                   final pin = paidPins[index];
-                  final price = pin['price_coin'] ?? 0;
+                  
+                  // 🔥 CORE FIX: Parsing aman di level Item Builder
+                  final price = int.tryParse(pin['price_coin'].toString()) ?? 0;
+                  
                   final String title = pin['title'] ?? 'Premium Photo';
                   final isHovered = hoveredIndex == index;
 
@@ -190,7 +194,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     cursor: SystemMouseCursors.click,
                     child: GestureDetector(
                       onTap: () async {
-                        // Jika user masuk detail lalu kembali, koin & pin tetap dicek kestabilannya
                         await Navigator.push(context, MaterialPageRoute(builder: (_) => PinDetailScreen(pin: pin)));
                         _syncUserProfileCoin();
                         _loadPaidPins();
@@ -252,9 +255,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                         ),
                                         child: Row(
                                           children: [
-                                            const Text('🪙 ', style: TextStyle(fontSize: 12)),
+                                            const Text('Rp ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                             Text(
-                                              '$price',
+                                              _formatRupiah(price),
                                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                             ),
                                           ],
@@ -307,9 +310,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                             const SizedBox(height: 4),
                                             Row(
                                               children: [
-                                                const Text('🪙 ', style: TextStyle(fontSize: 12)),
+                                                Text('Rp ', style: TextStyle(color: cs.primary, fontSize: 12, fontWeight: FontWeight.bold)),
                                                 Text(
-                                                  '$price',
+                                                  _formatRupiah(price),
                                                   style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
                                               ],
@@ -339,41 +342,156 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Future<void> _buyPin(dynamic pin) async {
+    final String title = pin['title'] ?? 'Premium Photo';
+    
+    // 🔥 CORE FIX: Parsing aman sebelum masuk ke kalkulasi sisa saldo dialog
+    final int price = int.tryParse(pin['price_coin'].toString()) ?? 0;
+    final int currentBalance = BalanceController().balance.value;
+    final int remainingBalance = currentBalance - price;
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('🛒 Konfirmasi Pembelian', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Table(
+                columnWidths: const {
+                  0: IntrinsicColumnWidth(),
+                  1: FixedColumnWidth(24),
+                  2: IntrinsicColumnWidth(),
+                },
+                children: [
+                  TableRow(children: [
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text('Harga')),
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text(':')),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4), 
+                      child: Text('Rp ${_formatRupiah(price)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ]),
+                  TableRow(children: [
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text('Saldo Anda')),
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text(':')),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4), 
+                      child: Text('Rp ${_formatRupiah(currentBalance)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ]),
+                  TableRow(children: [
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text('Sisa Saldo', style: TextStyle(fontWeight: FontWeight.w600))),
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text(':')),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4), 
+                      child: Text(
+                        'Rp ${_formatRupiah(remainingBalance)}', 
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          color: remainingBalance < 0 ? Colors.redAccent : Colors.green, 
+                        ),
+                      ),
+                    ),
+                  ]),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text('Apakah Anda yakin ingin membeli pin ini?', textAlign: TextAlign.center),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                // Mengubah warna tombol menjadi abu-abu jika saldo kurang agar terlihat lebih intuitif
+                backgroundColor: remainingBalance < 0 ? Colors.grey[400] : Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                if (remainingBalance < 0) {
+                  // Tutup pop-up dialog
+                  Navigator.pop(context, false);
+                  
+                  // Tampilkan pesan saldo kurang
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Silakan lakukan isi ulang di aplikasi Ono Pay, saldo Anda kurang.',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      backgroundColor: Colors.redAccent,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } else {
+                  // Lanjutkan transaksi jika saldo cukup
+                  Navigator.pop(context, true);
+                }
+              },
+              child: const Text('Beli'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
     final id = pin['id'];
     try {
-      final resp = await api.purchasePin(pinId: id);
+      final resp = await api.onopayPay(pinId: id);
+
       debugPrint("PURCHASE STATUS = ${resp.statusCode}");
       debugPrint("PURCHASE DATA = ${resp.data}");
+
       final data = resp.data;
-      
+
       if (data['success'] == true) {
-        final prefs = await SharedPreferences.getInstance();
-        final balance = data['data']?['balance'] ?? prefs.getInt('coin_balance') ?? 0;
-        await prefs.setInt('coin_balance', balance);
-        
-        await CoinController().setBalance(balance);
-        
-        // 🔥 REFRESH MARKETPLACE LIST: Setelah beli sukses, panggil ulang agar item yang dibeli hilang dari toko
         _loadPaidPins();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data['message'] ?? 'Purchase successful ✨'), backgroundColor: Colors.green),
+            SnackBar(
+              content: Text(data['message'] ?? 'Pembayaran berhasil'),
+              backgroundColor: Colors.green,
+            ),
           );
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data['message'] ?? 'Purchase failed'), backgroundColor: Colors.redAccent),
+            SnackBar(
+              content: Text(data['message'] ?? 'Pembayaran gagal'),
+              backgroundColor: Colors.redAccent,
+            ),
           );
         }
       }
     } catch (e) {
+      debugPrint("ONOPAY ERROR = $e");
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Purchase error. Silakan cek saldo koin Anda.'), backgroundColor: Colors.redAccent),
+          const SnackBar(
+            content: Text('Terjadi kesalahan pembayaran'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     }
-  }
-}
+  }}

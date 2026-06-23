@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/event_bus.dart';
 
@@ -21,21 +22,31 @@ class _EditPinWidgetState extends State<EditPinWidget> {
   bool saving = false;
   final ApiService apiService = ApiService();
 
+  // Fungsi bantuan untuk memformat nilai awal saat widget dibuka
+  String _formatInitialPrice(String price) {
+    String cleanPrice = price.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanPrice.isEmpty) return '0';
+    return cleanPrice.replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => '.');
+  }
+
   @override
   void initState() {
     super.initState();
     titleCtrl = TextEditingController(text: widget.pin['title']?.toString() ?? '');
     descCtrl = TextEditingController(text: widget.pin['description']?.toString() ?? '');
-    priceCtrl = TextEditingController(text: (widget.pin['price_coin'] ?? '0').toString());
+    
+    // Format harga awal dengan titik
+    final initialPrice = (widget.pin['price_coin'] ?? '0').toString();
+    priceCtrl = TextEditingController(text: _formatInitialPrice(initialPrice));
     
     final rawCategory = widget.pin['category_id'] ?? widget.pin['category']?['id'];
     final parsedCatId = rawCategory is int ? rawCategory : int.tryParse(rawCategory?.toString() ?? '');
 
-    // AMAN: Pastikan catId terdaftar di widget.categories untuk mencegah crash dropdown value mismatch
+    // AMAN: Pastikan catId terdaftar di widget.categories
     final bool hasCategory = widget.categories.any((c) => c['id'] == parsedCatId);
     catId = hasCategory ? parsedCatId : null;
 
-    // Ekstraksi nilai is_premium yang aman dari berbagai tipe data (int/bool)
     final dynamic ip = widget.pin['is_premium'];
     if (ip is int) {
       isPremium = ip == 1;
@@ -74,22 +85,47 @@ class _EditPinWidgetState extends State<EditPinWidget> {
     }
 
     setState(() => saving = true);
-    final price = int.tryParse(priceCtrl.text) ?? 0;
+    
+    // HILANGKAN TITIK SEBELUM DIKIRIM KE BACKEND (Clean Integer)
+    final cleanPriceString = priceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final price = int.tryParse(cleanPriceString) ?? 0;
+
+    // VALIDASI KATEGORI
+    if (catId == null) {
+      _showSnackBar('Kategori harus dipilih');
+      setState(() => saving = false);
+      return;
+    }
+
+    // LOGGING START
+    print('====================');
+    print('UPDATE PIN START');
+    print('PIN ID = ${widget.pin['id']}');
+    print('CATEGORY = $catId');
+    print('TITLE = ${titleCtrl.text}');
+    print('PRICE = $price');
+    print('====================');
     
     try {
       final resp = await apiService.updatePin(
         pinId: widget.pin['id'] as int,
-        categoryId: catId ?? int.tryParse(widget.pin['category']?['id']?.toString() ?? '0') ?? 0,
+        categoryId: catId!,
         title: titleCtrl.text.trim(),
         description: descCtrl.text.trim(),
         priceCoin: price,
         isPremium: isPremium,
       );
 
+      // LOGGING JIKA GAGAL RESPONSE 200
+      if (resp.statusCode != 200) {
+        print('UPDATE PIN FAILED');
+        print(resp.statusCode);
+        print(resp.data);
+      }
+
       if (!mounted) return;
 
       if (resp.statusCode == 200) {
-        // Ambil data Pin terbaru dari server dan broadcast ke komponen UI lain via Event Bus
         try {
           final fresh = await apiService.getPin(widget.pin['id'] as int);
           if (fresh.statusCode == 200 && fresh.data != null && fresh.data['data'] != null) {
@@ -104,8 +140,13 @@ class _EditPinWidgetState extends State<EditPinWidget> {
         Navigator.pop(context, true);
         return;
       }
-    } catch (e) {
-      debugPrint('Error mengedit pin: $e');
+    } catch (e, st) {
+      // LOGGING JIKA TERJADI EXCEPTION
+      print('====================');
+      print('UPDATE PIN ERROR');
+      print(e);
+      print(st);
+      print('====================');
     } finally {
       if (mounted) {
         setState(() => saving = false);
@@ -119,7 +160,7 @@ class _EditPinWidgetState extends State<EditPinWidget> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom, // Adaptif menaikkan sheet saat keyboard muncul
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
         decoration: const BoxDecoration(
@@ -132,7 +173,6 @@ class _EditPinWidgetState extends State<EditPinWidget> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- DEKORATOR DRAG HANDLE BAR ---
               Center(
                 child: Container(
                   width: 45,
@@ -151,7 +191,6 @@ class _EditPinWidgetState extends State<EditPinWidget> {
               ),
               const SizedBox(height: 20),
 
-              // --- INPUT JUDUL ---
               TextFormField(
                 controller: titleCtrl,
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
@@ -162,7 +201,6 @@ class _EditPinWidgetState extends State<EditPinWidget> {
               ),
               const SizedBox(height: 14),
 
-              // --- INPUT DESKRIPSI ---
               TextFormField(
                 controller: descCtrl,
                 maxLines: 3,
@@ -175,7 +213,6 @@ class _EditPinWidgetState extends State<EditPinWidget> {
               ),
               const SizedBox(height: 14),
 
-              // --- DROPDOWN PILIHAN KATEGORI ---
               DropdownButtonFormField<int>(
                 value: catId,
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.black87),
@@ -193,20 +230,22 @@ class _EditPinWidgetState extends State<EditPinWidget> {
               ),
               const SizedBox(height: 14),
 
-              // --- INPUT HARGA KOIN ---
               TextFormField(
                 controller: priceCtrl,
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly, 
+                  CurrencyFormat(), 
+                ],
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 decoration: InputDecoration(
-                  labelText: 'Harga Koin',
-                  prefixIcon: const Icon(Icons.monetization_on_outlined, size: 20),
+                  labelText: 'Harga (Rupiah)',
+                  prefixIcon: const Icon(Icons.account_balance_wallet_outlined, size: 20),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
               const SizedBox(height: 10),
 
-              // --- SWITCH PREMIUM STATUS ---
               Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8F9FA),
@@ -221,7 +260,7 @@ class _EditPinWidgetState extends State<EditPinWidget> {
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.black87),
                   ),
                   subtitle: Text(
-                    'Pengguna lain memerlukan koin untuk melihat pin ini.',
+                    'Pengguna lain akan membayar menggunakan OnoPay untuk mengakses pin ini.',
                     style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.w500),
                   ),
                   onChanged: (v) => setState(() => isPremium = v),
@@ -229,7 +268,6 @@ class _EditPinWidgetState extends State<EditPinWidget> {
               ),
               const SizedBox(height: 24),
 
-              // --- TOMBOL AKSI PANEL ---
               Row(
                 children: [
                   Expanded(
@@ -273,6 +311,27 @@ class _EditPinWidgetState extends State<EditPinWidget> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class CurrencyFormat extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.selection.baseOffset == 0) {
+      return newValue;
+    }
+
+    String cleanText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanText.isEmpty) return newValue.copyWith(text: '');
+
+    String formatted = cleanText.replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => '.');
+
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

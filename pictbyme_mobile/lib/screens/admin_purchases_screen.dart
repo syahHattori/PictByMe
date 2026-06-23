@@ -13,9 +13,13 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
   List purchases = [];
   bool loading = true;
 
-  // Menghitung total koin beredar dari data transaksi yang ada
-  int get totalCoinsTransacted {
-    return purchases.fold(0, (sum, item) => sum + (int.tryParse(item['price_coin'].toString()) ?? 0));
+  // Menghitung total nilai transaksi dalam Rupiah
+  int get totalTransactionValue {
+    return purchases.fold(0, (sum, item) {
+      // Mengambil 'price' atau fallback ke 'price_coin' jika backend masih menggunakan field lama
+      final val = item['price'] ?? item['price_coin'] ?? 0;
+      return sum + (int.tryParse(val.toString()) ?? 0);
+    });
   }
 
   @override
@@ -40,6 +44,14 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
     }
   }
 
+  // Helper untuk format angka ke Rupiah
+  String _formatRupiah(int number) {
+    return number.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
+      (Match m) => '${m[1]}.'
+    );
+  }
+
   // Helper untuk merapikan format tanggal ISO jika terlalu panjang
   String _formatDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return '-';
@@ -52,8 +64,6 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
   // --- 2. FUNGSI UTAMA BUILD ---
   @override
   Widget build(BuildContext context) {
-    
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // Latar belakang Slate modern
       appBar: AppBar(
@@ -99,10 +109,10 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: _buildMetricCard(
-                                title: 'Koin Berputar',
-                                value: '🪙 $totalCoinsTransacted',
-                                icon: Icons.monetization_on_rounded,
-                                color: Colors.amber.shade700,
+                                title: 'Nilai Transaksi',
+                                value: 'Rp ${_formatRupiah(totalTransactionValue)}',
+                                icon: Icons.account_balance_wallet_rounded,
+                                color: Colors.green.shade600,
                                 isCompact: isCompact,
                               ),
                             ),
@@ -114,7 +124,7 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
 
                     // Subtitle Informasi
                     const Text(
-                      'Log Aktivitas Pembelian Pin',
+                      'Log Aktivitas Pembelian Konten',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -155,8 +165,10 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
                                 final trx = purchases[i];
                                 final buyerName = trx['buyer']?['username']?.toString() ?? '-';
                                 final pinTitle = trx['pin']?['title']?.toString() ?? 'Konten Dihapus';
-                                final price = trx['price_coin'] ?? 0;
                                 final date = _formatDate(trx['created_at']);
+                                
+                                final rawPrice = trx['price'] ?? trx['price_coin'] ?? 0;
+                                final price = int.tryParse(rawPrice.toString()) ?? 0;
 
                                 return Card(
                                   margin: const EdgeInsets.symmetric(vertical: 6),
@@ -232,18 +244,18 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
                                         ),
                                         const SizedBox(width: 12),
                                         
-                                        // Badge Harga Koin Bergaya Modern
+                                        // Badge Harga Bergaya Modern (Uang)
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                           decoration: BoxDecoration(
-                                            color: Colors.amber.shade50,
+                                            color: Colors.green.shade50,
                                             borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Colors.amber.shade100, width: 1),
+                                            border: Border.all(color: Colors.green.shade200, width: 1),
                                           ),
                                           child: Text(
-                                            '🪙 $price',
+                                            'Rp ${_formatRupiah(price)}',
                                             style: TextStyle(
-                                              color: Colors.amber.shade900,
+                                              color: Colors.green.shade800,
                                               fontWeight: FontWeight.w900,
                                               fontSize: 13,
                                             ),
@@ -278,7 +290,7 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02), // FIX: Menggunakan standar .withValues terkini
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 12,
             offset: const Offset(0, 4),
           )
@@ -290,7 +302,7 @@ class _AdminPurchasesScreenState extends State<AdminPurchasesScreen> {
           Container(
             padding: EdgeInsets.all(isCompact ? 8 : 12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08), // FIX: Menggunakan standar .withValues terkini
+              color: color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, color: color, size: isCompact ? 20 : 26),

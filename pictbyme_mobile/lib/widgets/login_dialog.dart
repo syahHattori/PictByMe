@@ -58,8 +58,23 @@ class _LoginDialogState extends State<LoginDialog> {
       if (!mounted) return;
 
       if (response.data['success'] == true) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', response.data['token']);
+
+  print("LOGIN RESPONSE = ${response.data}");
+
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.setString(
+    'token',
+    response.data['token'],
+  );
+
+  print(
+    "TOKEN SAVED = ${response.data['token']}"
+  );
+
+  print(
+    "TOKEN READ BACK = ${prefs.getString('token')}"
+  );
 
         if (!mounted) return;
 

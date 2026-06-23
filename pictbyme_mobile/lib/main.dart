@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'services/theme_controller.dart';
 import 'services/notification_service.dart';
 import 'services/api_service.dart';
-import 'services/coin_controller.dart';
+import 'services/balance_controller.dart';
 import 'screens/auth_wrapper.dart';
 // Key global untuk navigasi tanpa perlu build context
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -28,7 +28,7 @@ Future<void> _initializeApp() async {
 
 debugPrint("APP TOKEN = $token");
     // Inisialisasi Coin
-    await CoinController().init();
+   await BalanceController().init();
     
     // Inisialisasi Notifikasi jika user terautentikasi
     if (token != null && token.isNotEmpty) {

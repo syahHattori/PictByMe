@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import 'admin_users_screen.dart';
 import 'admin_pins_screen.dart';
 import 'admin_purchases_screen.dart';
+import 'admin_comments_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -27,7 +28,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final resp = await api.getAdminDashboard();
       
-      // 🔥 BENARIN/TAMBAHKAN INI: Untuk cek isi JSON asli dari backend di Debug Console kamu
       debugPrint('====================================');
       debugPrint('ISI DATA RESPONS BACKEND DASHBOARD: ${resp.data}');
       debugPrint('====================================');
@@ -240,14 +240,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                 LayoutBuilder(
                   builder: (context, constraints) {
+                    // Karena koin dihapus (jadi 3 item), kolom diatur maksimal 3 agar simetris di monitor
                     int columns = constraints.maxWidth > 1100
-                        ? 4
+                        ? 3 
                         : constraints.maxWidth > 650
                             ? 2
                             : 1;
 
+                    // Rasio diperlebar sedikit di desktop agar mengisi ruang lebih baik
                     double aspectRatio = constraints.maxWidth > 1100
-                        ? 2.1
+                        ? 2.5 
                         : constraints.maxWidth > 650
                             ? 1.9
                             : 3.4;
@@ -265,7 +267,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         statCard(title: 'Total Users', value: stats['total_users'] ?? 0, icon: Icons.people_alt_rounded, color: Colors.blueAccent, isCompact: isCompact),
                         statCard(title: 'Total Pins', value: stats['total_pins'] ?? 0, icon: Icons.grid_view_rounded, color: Colors.indigoAccent, isCompact: isCompact),
                         statCard(title: 'Transaksi Sukses', value: stats['total_purchases'] ?? 0, icon: Icons.shopping_bag_rounded, color: Colors.green, isCompact: isCompact),
-                        statCard(title: 'Koin Beredar', value: stats['total_coins'] ?? 0, icon: Icons.monetization_on_rounded, color: Colors.amber.shade700, isCompact: isCompact),
                       ],
                     );
                   },
@@ -281,13 +282,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     int menuColumns = constraints.maxWidth > 900
-                        ? 3
+                        ? 4
                         : constraints.maxWidth > 600
                             ? 2
                             : 1;
 
                     double menuRatio = constraints.maxWidth > 900
-                        ? 4.0
+                        ? 3.0
                         : constraints.maxWidth > 600
                             ? 3.4
                             : 4.8;
@@ -305,7 +306,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           icon: Icons.person_search_rounded,
                           color: Colors.blueAccent,
                           onTap: () async {
-                            // 🔥 BENARIN INI: Menunggu screen ditutup, lalu refresh otomatis data dashboard
                             await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsersScreen()));
                             setState(() => loading = true);
                             loadDashboard();
@@ -316,7 +316,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           icon: Icons.grid_view_rounded,
                           color: Colors.indigoAccent,
                           onTap: () async {
-                            // 🔥 BENARIN INI: Menunggu screen ditutup, lalu refresh otomatis data dashboard
                             await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPinsScreen()));
                             setState(() => loading = true);
                             loadDashboard();
@@ -327,8 +326,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           icon: Icons.receipt_long_rounded,
                           color: Colors.green,
                           onTap: () async {
-                            // 🔥 BENARIN INI: Menunggu screen ditutup, lalu refresh otomatis data dashboard
                             await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPurchasesScreen()));
+                            setState(() => loading = true);
+                            loadDashboard();
+                          },
+                        ),
+                        menuButton(
+                          label: 'Kelola Komentar',
+                          icon: Icons.comment_rounded,
+                          color: Colors.redAccent,
+                          onTap: () async {
+                            await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCommentsScreen()));
                             setState(() => loading = true);
                             loadDashboard();
                           },

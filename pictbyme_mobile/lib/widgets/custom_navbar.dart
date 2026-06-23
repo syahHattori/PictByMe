@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/coin_controller.dart'; // Pastikan import ini ada
+import '../services/balance_controller.dart';
 import 'login_dialog.dart';
 import 'register_dialog.dart';
 import '../screens/home_page.dart';
@@ -85,12 +85,12 @@ class _CustomNavbarState extends State<CustomNavbar> {
                   child: const Text("Sign Up"),
                 ),
               ] else ...[
-                // REAKTIF: Menampilkan saldo dari CoinController
+               
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(color: Colors.amber.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
                   child: ValueListenableBuilder<int>(
-                    valueListenable: CoinController().balance,
+                    valueListenable:BalanceController().balance,
                     builder: (context, balance, _) => Text(
                       "🪙 $balance",
                       style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.amber),

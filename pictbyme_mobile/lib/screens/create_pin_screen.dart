@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // DITAMBAHKAN: Untuk TextInputFormatter
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -21,10 +22,10 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
   bool isUploading = false;
 
   static const Color primaryBlue = Color(0xFF0077B6);
+  static const Color moneyGreen = Color(0xFF10B981);
 
   final ApiService apiService = ApiService();
 
-  // Fallback categories shown when API returns none or is unreachable
   final List<Map<String, Object>> defaultCategories = const [
     {'id': 1, 'name': 'Food'},
     {'id': 2, 'name': 'Anime'},
@@ -149,14 +150,15 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
     }
 
     if (isPaid && priceController.text.trim().isEmpty) {
-      _showSnackBar('Silakan tentukan harga koin untuk Pin premium', Colors.orangeAccent);
+      _showSnackBar('Silakan tentukan harga (Rupiah) untuk Pin premium', Colors.orangeAccent);
       return;
     }
 
     try {
       setState(() => isUploading = true);
 
-      final price = isPaid ? int.tryParse(priceController.text.trim()) ?? 0 : 0;
+      // Membersihkan titik pemisah ribuan sebelum dikirim ke API
+      final price = isPaid ? int.tryParse(priceController.text.trim().replaceAll('.', '')) ?? 0 : 0;
       String fileUrl = imageUrlController.text.trim();
 
       if (selectedImage != null) {
@@ -176,7 +178,6 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
           if (resp.statusCode == 200 && resp.data != null && resp.data['file_url'] != null) {
             fileUrl = resp.data['file_url'];
             imageUrlController.text = fileUrl;
-            // AMAN KROSS-PLATFORM: Mencegah crash pemanggilan Platform di Web browser
             if (!kIsWeb && Platform.isAndroid) {
               imageUrlController.text = imageUrlController.text.replaceAll('localhost', '10.0.2.2');
             }
@@ -192,12 +193,12 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
         title: titleController.text.trim(),
         description: descriptionController.text.trim(),
         fileUrl: fileUrl,
-        priceCoin: price,
+        priceCoin: price, 
         isPremium: isPaid,
       );
 
       if (!mounted) return;
-      _showSnackBar('Pin beres dibuat dan siap dibagikan!', Colors.green);
+      _showSnackBar('Karya berhasil dipublikasikan!', Colors.green);
       Navigator.pop(context, {'isPaid': price > 0});
     } catch (e) {
       debugPrint("===== UPLOAD ERROR =====");
@@ -436,13 +437,22 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                     const SizedBox(height: 24),
 
                     // --- SECTION 3: PREMIUM MONETIZATION CARD ---
-                    Container(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isPaid ? moneyGreen.withOpacity(0.03) : Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: isPaid ? Colors.amber.withOpacity(0.4) : Colors.grey.withOpacity(0.15), width: 1.5),
+                        border: Border.all(
+                          color: isPaid ? moneyGreen.withOpacity(0.5) : Colors.grey.withOpacity(0.15), 
+                          width: 1.5
+                        ),
                         boxShadow: [
-                          BoxShadow(color: isPaid ? Colors.amber.withOpacity(0.04) : Colors.black.withOpacity(0.01), blurRadius: 10, offset: const Offset(0, 4))
+                          BoxShadow(
+                            color: isPaid ? moneyGreen.withOpacity(0.08) : Colors.black.withOpacity(0.01), 
+                            blurRadius: 12, 
+                            offset: const Offset(0, 4)
+                          )
                         ],
                       ),
                       child: Column(
@@ -451,13 +461,16 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                             value: isPaid,
                             title: const Row(
                               children: [
-                                Icon(Icons.monetization_on_rounded, color: Colors.amber, size: 22),
+                                Icon(Icons.payments_rounded, color: moneyGreen, size: 22),
                                 SizedBox(width: 8),
-                                Text('Komersilkan Pin Ini', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                                Text('Komersilkan Karya Ini', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                               ],
                             ),
-                            subtitle: Text('Pengguna lain harus membayar menggunakan saldo koin mereka untuk melihat karyamu.', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                            activeColor: Colors.amber,
+                            subtitle: Text(
+                              'Atur harga dalam Rupiah. Pengguna lain perlu melakukan pembayaran untuk melihat mahakaryamu.', 
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600])
+                            ),
+                            activeColor: moneyGreen,
                             onChanged: (v) {
                               setState(() {
                                 isPaid = v;
@@ -465,21 +478,44 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
                               });
                             },
                           ),
-                          if (isPaid)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 18),
-                              child: TextFormField(
-                                controller: priceController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  prefixIcon: const Icon(Icons.toll_rounded, color: Colors.amber),
-                                  labelText: 'Tarif Pin (Jumlah Koin)',
-                                  hintText: 'Contoh: 50',
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.amber, width: 2)),
-                                ),
-                              ),
-                            ),
+                          
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                            child: isPaid
+                                ? Padding(
+                                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20, top: 4),
+                                    child: TextFormField(
+                                      controller: priceController,
+                                      keyboardType: TextInputType.number,
+                                      // DITAMBAHKAN: Format input otomatis saat mengetik
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly, // Hanya terima angka
+                                        CurrencyInputFormatter(),               // Tambah titik ribuan
+                                      ],
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                                      decoration: InputDecoration(
+                                        prefixText: 'Rp ',
+                                        prefixStyle: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black87, fontSize: 16),
+                                        labelText: 'Tarif Eksklusif',
+                                        labelStyle: const TextStyle(color: moneyGreen),
+                                        hintText: 'Contoh: 15.000',
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14), 
+                                          borderSide: BorderSide(color: moneyGreen.withOpacity(0.3), width: 1)
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14), 
+                                          borderSide: const BorderSide(color: moneyGreen, width: 2)
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
                         ],
                       ),
                     ),
@@ -507,7 +543,6 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
             ),
           ),
 
-          // FULL SCREEN BLUR OVERLAY LOADING
           if (isUploading)
             Container(
               color: Colors.black.withOpacity(0.3),
@@ -524,6 +559,36 @@ class _CreatePinScreenState extends State<CreatePinScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+// --- DITAMBAHKAN: Class Formatter untuk format ribuan otomatis ---
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    // Hanya ambil angka
+    String numericOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    // Proses penambahan titik dari belakang
+    String formatted = '';
+    int count = 0;
+    for (int i = numericOnly.length - 1; i >= 0; i--) {
+      if (count != 0 && count % 3 == 0) {
+        formatted = '.$formatted';
+      }
+      formatted = numericOnly[i] + formatted;
+      count++;
+    }
+
+    // Mengembalikan nilai yang sudah diformat dan meletakkan kursor di akhir
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

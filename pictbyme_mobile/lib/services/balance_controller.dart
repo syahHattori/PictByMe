@@ -1,17 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class CoinController {
-  CoinController._internal();
-  static final CoinController _instance = CoinController._internal();
-  factory CoinController() => _instance;
+class BalanceController {
+  BalanceController._internal();
+  static final BalanceController _instance =
+      BalanceController._internal();
+
+  factory BalanceController() => _instance;
 
   final ValueNotifier<int> balance = ValueNotifier<int>(0);
 
   Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      balance.value = prefs.getInt('coin_balance') ?? 0;
+      balance.value = prefs.getInt('balance') ?? 0;
     } catch (_) {
       balance.value = 0;
     }
@@ -19,9 +21,10 @@ class CoinController {
 
   Future<void> setBalance(int v) async {
     balance.value = v;
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('coin_balance', v);
+      await prefs.setInt('balance', v);
     } catch (_) {}
   }
 

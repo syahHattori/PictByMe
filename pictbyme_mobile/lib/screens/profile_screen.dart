@@ -5,9 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import '../services/api_service.dart';
-import '../services/coin_controller.dart';
+import '../services/balance_controller.dart';
 import 'boards_screen.dart';
-import 'topup_screen.dart';
 import 'landing_screen.dart';
 import 'my_pins_screen.dart';
 import 'pin_detail_screen.dart';
@@ -35,6 +34,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadMyPins();
   }
 
+  // Fungsi helper untuk format angka ke Rupiah yang aman
+  String _formatRupiah(dynamic value) {
+    int number = 0;
+    if (value is int) {
+      number = value;
+    } else if (value is double) {
+      number = value.toInt();
+    } else if (value is String) {
+      number = int.tryParse(value) ?? 0;
+    }
+    return number.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
+      (Match m) => '${m[1]}.'
+    );
+  }
+
   Future<void> _loadProfile() async {
     setState(() => loadingProfile = true);
     try {
@@ -43,9 +58,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final userData = Map<String, dynamic>.from(resp.data['user']);
         setState(() => profile = userData);
         
-        // Sinkronisasi balance koin terbaru ke controller global aplikasi
-        final currentBalance = userData['coin_balance'] ?? 0;
-        await CoinController().setBalance(currentBalance);
+        // Mengambil saldo OnoPay sebagai ganti koin
+        final phone = userData['onopay_phone'];
+        if (phone != null && phone.toString().isNotEmpty) {
+          try {
+            final balanceResp = await apiService.getOnoPayBalance();
+            final currentBal = balanceResp.data['data']['balance'] ?? 0;
+          BalanceController().balance.value = int.tryParse(currentBal.toString()) ?? 0;
+          } catch (e) {
+            debugPrint('Error sync OnoPay on Profile: $e');
+        BalanceController().balance.value = 0;
+          }
+        } else {
+      BalanceController().balance.value = 0;
+        }
       }
     } catch (_) {}
     setState(() => loadingProfile = false);
@@ -99,7 +125,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _goToBoards() => Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
-  void _goToTopup() => Navigator.push(context, MaterialPageRoute(builder: (_) => const TopupScreen()));
 
   Future<void> _showEditProfileDialog() async {
     final nameCtrl = TextEditingController(text: profile?['name'] ?? '');
@@ -280,10 +305,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatItem(String value, String label) {
     return Expanded(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: Colors.black87)),
+          // Menggunakan FittedBox agar teks Rupiah yang panjang tidak melebihi kotak layarnya
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Colors.black87)),
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w600)),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -450,7 +483,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 28),
 
-              // --- STATS ROW (Floating Card dengan Koin Reaktif) ---
+              // --- STATS ROW (Menampilkan Saldo OnoPay) ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 padding: const EdgeInsets.symmetric(vertical: 20),
@@ -468,11 +501,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildStatItem('0', 'Boards'),
                     Container(height: 40, width: 1, color: Colors.grey[200]),
                     
-                    // ValueListenableBuilder memantau CoinController secara realtime
+                  
                     ValueListenableBuilder<int>(
-                      valueListenable: CoinController().balance,
+                      valueListenable: BalanceController().balance,
                       builder: (context, balanceValue, _) {
-                        return _buildStatItem('$balanceValue', 'Coins');
+                        return _buildStatItem('Rp ${_formatRupiah(balanceValue)}', 'OnoPay');
                       },
                     ),
                   ],
@@ -495,8 +528,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     const SizedBox(height: 8),
                     _buildMenuItem(icon: Icons.folder_rounded, title: 'My Boards', iconColor: Colors.blueAccent, onTap: _goToBoards),
-                    Divider(height: 1, color: Colors.grey[100], indent: 64, endIndent: 20),
-                    _buildMenuItem(icon: Icons.monetization_on_rounded, title: 'Top Up Coin', iconColor: Colors.amber.shade600, onTap: _goToTopup),
                     Divider(height: 1, color: Colors.grey[100], indent: 64, endIndent: 20),
                     _buildMenuItem(icon: Icons.lock_rounded, title: 'Change Password', iconColor: Colors.teal, onTap: _showChangePasswordDialog),
                     Divider(height: 1, color: Colors.grey[100], indent: 64, endIndent: 20),

@@ -95,7 +95,6 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
-    // debug: print token used for authenticated requests
     print('TOKEN = $token');
 
     return await dio.get(
@@ -245,9 +244,7 @@ class ApiService {
     );
   }
 
-  Future<Response> getBoardDetail(
-    int boardId,
-  ) async {
+  Future<Response> getBoardDetail(int boardId) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
@@ -295,7 +292,6 @@ class ApiService {
     );
   }
 
-  // 🔥 TAMBAHKAN INI: Fungsi untuk mengirim komentar ke Backend API
   Future<Response> addComment({
     required int pinId,
     required String content,
@@ -315,54 +311,15 @@ class ApiService {
       ),
     );
   }
-Future<Response> deleteComment({
-  required int commentId,
-}) async {
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('token');
 
-  return await dio.delete(
-    '/admin/comments/$commentId',
-    options: Options(
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
-    ),
-  );
-}
-  Future<Response> topup({
-    required int amount,
+  Future<Response> deleteComment({
+    required int commentId,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
-    return await dio.post(
-      '/topup',
-      data: {
-        'amount': amount,
-      },
-      options: Options(
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      ),
-    );
-  }
-
-  // 🔥 Fungsi untuk cek status pembayaran
-  Future<Response> checkPaymentStatus({
-    required String qrCode,
-    required int amount,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-
-    return await dio.post(
-      '/topup/check-status',
-      data: {
-        'qr_code': qrCode,
-        'amount': amount,
-      },
+    return await dio.delete(
+      '/admin/comments/$commentId',
       options: Options(
         headers: {
           'Authorization': 'Bearer $token',
@@ -407,7 +364,7 @@ Future<Response> deleteComment({
       ),
     );
   }
-  
+
   Future<Response> uploadImage({
     required String filePath,
   }) async {
@@ -628,12 +585,79 @@ Future<Response> deleteComment({
     );
   }
 
+  Future<Response> getAdminComments() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.get(
+      '/admin/comments',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
   Future<Response> getNotifications() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
     return await dio.get(
       '/notifications',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
+  // 🔥 LANGKAH 1: Method Integrasi OnoPay (Sudah Berdiri Sendiri)
+  Future<Response> connectOnoPay({
+    required String phoneNumber,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.post(
+      '/connect-onopay',
+      data: {
+        'phone_number': phoneNumber,
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
+  Future<Response> onopayPay({
+    required int pinId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.post(
+      '/onopay-pay',
+      data: {
+        'pin_id': pinId,
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
+  Future<Response> getOnoPayBalance() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return await dio.get(
+      '/onopay-balance',
       options: Options(
         headers: {
           'Authorization': 'Bearer $token',
