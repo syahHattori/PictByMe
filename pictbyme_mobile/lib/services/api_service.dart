@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
@@ -613,7 +614,36 @@ class ApiService {
     );
   }
 
-  // 🔥 LANGKAH 1: Method Integrasi OnoPay (Sudah Berdiri Sendiri)
+  Future<Response> submitTopupRequest({
+    required int amount,
+    required String qrCode,
+    required File proofImage,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    String fileName = proofImage.path.split('/').last;
+
+    FormData formData = FormData.fromMap({
+      'amount': amount,
+      'qr_code': qrCode,
+      'proof_image': await MultipartFile.fromFile(
+        proofImage.path,
+        filename: fileName,
+      ),
+    });
+
+    return await dio.post(
+      '/topup-request',
+      data: formData,
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
   Future<Response> connectOnoPay({
     required String phoneNumber,
   }) async {

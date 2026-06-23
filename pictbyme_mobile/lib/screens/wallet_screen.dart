@@ -13,6 +13,10 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   final ApiService apiService = ApiService();
 
+  // 🔥 STATE VARIABEL BARU
+  final TextEditingController phoneController = TextEditingController();
+  bool isConnecting = false;
+
   String? onopayPhone;
   int onopayBalance = 0;
   bool isConnected = false;
@@ -22,6 +26,12 @@ class _WalletScreenState extends State<WalletScreen> {
   void initState() {
     super.initState();
     loadOnopayData(); 
+  }
+
+  @override
+  void dispose() {
+    phoneController.dispose(); // Cegah kebocoran memori (memory leak)
+    super.dispose();
   }
 
   // Helper untuk format angka ke Rupiah standar tanpa package tambahan
@@ -56,7 +66,6 @@ class _WalletScreenState extends State<WalletScreen> {
         isLoadingOnopay = false;
       });
 
-      // agar tombol saldo di Home Screen ikut berubah menampilkan saldo fresh ini.
       BalanceController().balance.value = currentBal;
 
     } catch (e) {
@@ -64,6 +73,38 @@ class _WalletScreenState extends State<WalletScreen> {
         isLoadingOnopay = false;
       });
       debugPrint('ONOPAY ERROR $e');
+    }
+  }
+
+  // 🔥 METHOD BARU UNTUK PROSES KONEKSI KE ONOPAY DARI WALLET PAGE
+  Future<void> connectOnoPay() async {
+    final phone = phoneController.text.trim();
+    if (phone.isEmpty) {
+      _showSnackBar('Silakan masukkan nomor HP OnoPay terlebih dahulu', Colors.orangeAccent);
+      return;
+    }
+
+    setState(() {
+      isConnecting = true;
+    });
+
+    try {
+      final res = await apiService.connectOnoPay(phoneNumber: phone);
+      if (res.data['success'] == true || res.statusCode == 200) {
+        _showSnackBar('Akun OnoPay berhasil ditautkan! ✨', Colors.green);
+        phoneController.clear();
+        await loadOnopayData(); // Reload data wallet agar langsung tampil saldonya
+      } else {
+        _showSnackBar(res.data['message'] ?? 'Gagal menghubungkan akun', Colors.redAccent);
+      }
+    } catch (e) {
+      _showSnackBar('Terjadi kesalahan koneksi server: $e', Colors.redAccent);
+    } finally {
+      if (mounted) {
+        setState(() {
+          isConnecting = false;
+        });
+      }
     }
   }
 
@@ -85,7 +126,7 @@ class _WalletScreenState extends State<WalletScreen> {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9), // Background abu-abu soft yang lebih clean
+      backgroundColor: const Color(0xFFF4F6F9), 
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -113,7 +154,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   
-                  // 🔥 TAMPILAN KARTU PREMIUM ONOPAY WALLET (BUAT CANTIK)
+                  // TAMPILAN KARTU PREMIUM ONOPAY WALLET
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     width: double.infinity,
@@ -164,13 +205,17 @@ class _WalletScreenState extends State<WalletScreen> {
                                 color: Colors.white.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(30),
                               ),
-                              child: const Row(
+                              child: Row(
                                 children: [
-                                  Icon(Icons.verified_user_rounded, color: Colors.white, size: 14),
-                                  SizedBox(width: 4),
+                                  Icon(
+                                    isConnected ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded, 
+                                    color: Colors.white, 
+                                    size: 14
+                                  ),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'Aktif',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                                    isConnected ? 'Aktif' : 'Belum Taut',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
                                   ),
                                 ],
                               ),
@@ -185,13 +230,72 @@ class _WalletScreenState extends State<WalletScreen> {
                               child: CircularProgressIndicator(color: Colors.white),
                             ),
                           ),
+                          
+                        // 🔥 MODIFIKASI: DARI HANYA TEXT SEKARANG MENJADI INPUT FORM INTERAKTIF CANTIK
                         if (!isLoadingOnopay && !isConnected)
-                          const Center(
-                            child: Text(
-                              'Belum Tersambung ke OnoPay',
-                              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 15),
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Belum Tersambung ke OnoPay',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: phoneController,
+                                keyboardType: TextInputType.phone,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                decoration: InputDecoration(
+                                  hintText: 'Masukkan Nomor HP OnoPay',
+                                  hintStyle: const TextStyle(color: Colors.white60),
+                                  prefixIcon: const Icon(Icons.phone_android, color: Colors.white70),
+                                  filled: true,
+                                  fillColor: Colors.white.withOpacity(0.15),
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(color: Colors.white30),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(color: Colors.white, width: 1.5),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF4364F7),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                  onPressed: isConnecting ? null : connectOnoPay,
+                                  child: isConnecting
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5, 
+                                            color: Color(0xFF4364F7)
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Hubungkan OnoPay', 
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
+                                        ),
+                                ),
+                              ),
+                            ],
                           ),
+                          
                         if (!isLoadingOnopay && isConnected)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
