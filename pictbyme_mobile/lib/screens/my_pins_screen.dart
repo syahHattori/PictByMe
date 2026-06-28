@@ -87,9 +87,21 @@ class _MyPinsScreenState extends State<MyPinsScreen> {
         return {...Map<String, dynamic>.from(item), 'source_type': 'uploaded'};
       }).toList();
 
-      final List mappedPurchasedPins = rawPurchasedPins.map((item) {
-        return {...Map<String, dynamic>.from(item), 'source_type': 'purchased'};
-      }).toList();
+     final List mappedPurchasedPins = rawPurchasedPins.map((item) {
+  final purchase = Map<String, dynamic>.from(item);
+
+  final pin = Map<String, dynamic>.from(
+    purchase['pin'] ?? {},
+  );
+
+  pin['source_type'] = 'purchased';
+  pin['purchase_id'] = purchase['purchase_id'];
+  pin['price'] = purchase['price'];
+  pin['payment_method'] = purchase['payment_method'];
+  pin['purchased_at'] = purchase['purchased_at'];
+
+  return pin;
+}).toList();
 
       setState(() {
         pins = [...mappedMyPins, ...mappedPurchasedPins];

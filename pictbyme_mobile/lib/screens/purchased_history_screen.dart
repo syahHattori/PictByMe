@@ -26,7 +26,11 @@ class _PurchasedHistoryScreenState extends State<PurchasedHistoryScreen> {
   Future<void> _loadPurchasedPins() async {
     setState(() => loading = true);
     try {
-      final resp = await apiService.getPurchasedPins();
+     final resp = await apiService.getPurchasedPins();
+
+print("========== PURCHASED HISTORY ==========");
+print(resp.data);
+print("======================================");
       if (resp.statusCode == 200 && resp.data != null) {
         final list = resp.data['data'] as List? ?? [];
         setState(() => purchases = List<dynamic>.from(list));

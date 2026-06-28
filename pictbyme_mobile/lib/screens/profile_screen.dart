@@ -57,6 +57,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final resp = await apiService.getProfile();
       if (resp.statusCode == 200 && resp.data != null && resp.data['user'] != null) {
         final userData = Map<String, dynamic>.from(resp.data['user']);
+        debugPrint("====================");
+debugPrint(userData.toString());
+debugPrint("====================");
         setState(() => profile = userData);
         
         // Mengambil saldo OnoPay sebagai ganti koin
