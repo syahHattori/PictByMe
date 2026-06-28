@@ -10,6 +10,7 @@ import 'boards_screen.dart';
 import 'landing_screen.dart';
 import 'my_pins_screen.dart';
 import 'pin_detail_screen.dart';
+import 'purchased_history_screen.dart';
 import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -125,6 +126,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _goToBoards() => Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardsScreen()));
+
+  void _goToPurchasedHistory() => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchasedHistoryScreen()));
 
   Future<void> _showEditProfileDialog() async {
     final nameCtrl = TextEditingController(text: profile?['name'] ?? '');
@@ -322,7 +325,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildMenuItem({required IconData icon, required String title, required VoidCallback onTap, Color iconColor = Colors.blueGrey, bool isDestructive = false}) {
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color iconColor = Colors.blueGrey,
+    bool isDestructive = false,
+    String? subtitle,
+  }) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       leading: Container(
@@ -334,6 +344,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Icon(icon, color: isDestructive ? Colors.redAccent : iconColor, size: 22),
       ),
       title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: isDestructive ? Colors.redAccent : Colors.black87)),
+      subtitle: subtitle != null
+          ? Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey))
+          : null,
       trailing: isDestructive ? null : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: onTap,
     );
@@ -528,6 +541,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     const SizedBox(height: 8),
                     _buildMenuItem(icon: Icons.folder_rounded, title: 'My Boards', iconColor: Colors.blueAccent, onTap: _goToBoards),
+                    Divider(height: 1, color: Colors.grey[100], indent: 64, endIndent: 20),
+                    _buildMenuItem(
+                      icon: Icons.shopping_bag_outlined,
+                      title: 'Purchased History',
+                      subtitle: 'View all purchased premium pins',
+                      iconColor: Colors.deepPurple,
+                      onTap: _goToPurchasedHistory,
+                    ),
                     Divider(height: 1, color: Colors.grey[100], indent: 64, endIndent: 20),
                     _buildMenuItem(icon: Icons.lock_rounded, title: 'Change Password', iconColor: Colors.teal, onTap: _showChangePasswordDialog),
                     Divider(height: 1, color: Colors.grey[100], indent: 64, endIndent: 20),

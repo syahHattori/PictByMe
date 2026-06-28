@@ -6,7 +6,6 @@ import '../services/notification_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
-
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
@@ -21,17 +20,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _load();
-    
     try {
       _sub = NotificationService().stream.listen((payload) {
         if (!mounted) return;
         setState(() {
           items.insert(0, {
-            'data': payload, 
+            'data': payload,
             'created_at': DateTime.now().toIso8601String()
           });
         });
-
         _showQuickSnackBar(payload['message'] ?? 'Anda menerima notifikasi baru');
       });
     } catch (e) {
@@ -67,11 +64,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _load() async {
     if (!mounted) return;
     setState(() => loading = true);
-    
     try {
       final resp = await api.getNotifications();
       if (!mounted) return;
-      
       if (resp.statusCode == 200 && resp.data != null) {
         setState(() => items = resp.data['data'] ?? []);
       }
@@ -84,7 +79,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Map<String, dynamic> _getNotificationStyle(String? iconType, String message) {
     final msgLower = message.toLowerCase();
-    
     if (iconType == 'favorite' || msgLower.contains('suka') || msgLower.contains('like')) {
       return {
         'icon': Icons.favorite_rounded,
@@ -93,7 +87,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         'badgeColor': Colors.pink.shade400,
         'gradient': LinearGradient(colors: [Colors.pink.shade50, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
       };
-    // Mengganti deteksi koin dengan pembayaran / OnoPay dan mengubah UI-nya menjadi hijau
+      // Mengganti deteksi koin dengan pembayaran / OnoPay dan mengubah UI-nya menjadi hijau
     } else if (iconType == 'monetization_on' || iconType == 'account_balance_wallet' || msgLower.contains('beli') || msgLower.contains('purchase') || msgLower.contains('bayar')) {
       return {
         'icon': Icons.account_balance_wallet_rounded,
@@ -124,7 +118,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA), 
+      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -138,9 +132,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Text(
               'Notifikasi',
               style: TextStyle(
-                color: Colors.black87, 
+                color: Colors.black87,
                 fontWeight: FontWeight.w900,
-                fontSize: 19, 
+                fontSize: 19,
                 letterSpacing: -0.5
               ),
             ),
@@ -191,19 +185,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           final data = n['data'] ?? {};
                           final from = data['from_user'] ?? {};
                           final pin = data['pin'] ?? {};
-                          
                           final pinId = pin['id'] ?? data['pin_id'];
                           final message = data['message'] ?? '';
                           final username = from['username'] ?? 'Seseorang';
                           final pinImageUrl = pin['image_url'];
                           final hasProfile = from['profile_picture'] != null && from['profile_picture'].toString().isNotEmpty;
-
                           final style = _getNotificationStyle(data['icon']?.toString(), message);
+
+                          // Harga pembelian (kalau notifikasi ini notifikasi pembelian pin via OnoPay).
+                          // amount_formatted dikirim langsung dari backend, jadi tidak perlu format ulang di sini.
+                          final amountFormatted = data['amount_formatted']?.toString();
+                          final isPurchase = data['type']?.toString() == 'pin_purchased' &&
+                              amountFormatted != null &&
+                              amountFormatted.isNotEmpty;
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
                             decoration: BoxDecoration(
-                              gradient: style['gradient'], 
+                              gradient: style['gradient'],
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
@@ -260,7 +259,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     children: [
                                       TextSpan(
                                         text: '$username ',
-                                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black), 
+                                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black),
                                       ),
                                       TextSpan(
                                         text: message,
@@ -279,6 +278,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                         _timeAgo(n['created_at']?.toString() ?? ''),
                                         style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w700),
                                       ),
+                                      if (isPurchase) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.shade50,
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: Colors.green.shade200),
+                                          ),
+                                          child: Text(
+                                            amountFormatted,
+                                            style: TextStyle(
+                                              color: Colors.green.shade700,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -332,7 +350,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final dt = DateTime.parse(iso);
       final diff = DateTime.now().difference(dt);
-      
       if (diff.inSeconds < 60) return 'Baru saja';
       if (diff.inMinutes < 60) return '${diff.inMinutes} menit yang lalu';
       if (diff.inHours < 24) return '${diff.inHours} jam yang lalu';
