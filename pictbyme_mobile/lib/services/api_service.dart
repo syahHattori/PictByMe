@@ -19,18 +19,32 @@ class ApiService {
     ),
   );
 
-  Future<Response> login({
-    required String email,
-    required String password,
-  }) async {
-    return await dio.post(
+  Future<Response?> login({
+  required String email,
+  required String password,
+}) async {
+  try {
+    final response = await dio.post(
       '/login',
       data: {
         'email': email,
         'password': password,
       },
     );
+
+    debugPrint("LOGIN SUCCESS = ${response.data}");
+    return response;
+  } on DioException catch (e) {
+    debugPrint("LOGIN ERROR");
+    debugPrint("STATUS = ${e.response?.statusCode}");
+    debugPrint("DATA = ${e.response?.data}");
+    debugPrint("MESSAGE = ${e.message}");
+    return null;
+  } catch (e) {
+    debugPrint("UNKNOWN ERROR = $e");
+    return null;
   }
+}
 
   Future<Response> register({
     required String name,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/login_dialog.dart';
 import '../widgets/register_dialog.dart';
 import 'home_page.dart';
@@ -9,6 +10,16 @@ class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
 
   static const Color primaryBlue = Color(0xFF0077B6);
+
+  // URL APK yang sudah diupload di server (lihat public/download/app-release.apk).
+  static const String _apkUrl = 'https://api.pictbyme.web.id/download/app-release.apk';
+
+  Future<void> _downloadApk() async {
+    final uri = Uri.parse(_apkUrl);
+    // externalApplication agar di web membuka tab baru / langsung memicu download,
+    // mirip perilaku target="_blank" pada tag <a>.
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +287,26 @@ class LandingScreen extends StatelessWidget {
                                 Navigator.push(context, MaterialPageRoute(builder: (_) => const FeaturesPage()));
                               },
                               child: const Text('Learn More'),
+                            ),
+                            // TOMBOL DOWNLOAD ANDROID
+                            // Wrap akan otomatis menurunkan tombol ini ke baris baru di layar
+                            // sempit (mobile), tepat di bawah Get Started & Learn More.
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryBlue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 28,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: _downloadApk,
+                              icon: const Icon(Icons.android),
+                              label: const Text('Download Android'),
                             ),
                           ],
                         ),

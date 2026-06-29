@@ -2,105 +2,129 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:pusher_client/pusher_client.dart';
+import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 
 import 'api_service.dart';
 
 class NotificationService {
   NotificationService._internal();
-  static final NotificationService _instance = NotificationService._internal();
+
+  static final NotificationService _instance =
+      NotificationService._internal();
+
   factory NotificationService() => _instance;
 
-  PusherClient? _pusher;
-  Channel? _channel;
-  String? _channelName;
-  final StreamController<Map<String, dynamic>> _controller = StreamController.broadcast();
+  final _pusher = PusherChannelsFlutter.getInstance();
+
+  final StreamController<Map<String, dynamic>> _controller =
+      StreamController.broadcast();
 
   Stream<Map<String, dynamic>> get stream => _controller.stream;
 
-  bool get isConnected => _pusher != null;
+  bool _initialized = false;
 
-  Future<void> init({required int userId, String? pusherKey, String? cluster}) async {
-    // Read token and build auth endpoint
+  Future<void> init({
+    required int userId,
+    String? pusherKey,
+    String? cluster,
+  }) async {
+    if (_initialized) return;
+
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
+    final token = prefs.getString("token") ?? "";
 
-    final hostApi = ApiService.baseUrl; // e.g. http://127.0.0.1:8000/api
-    final host = hostApi.replaceFirst(RegExp(r"/api$"), '');
-    final authEndpoint = '$host/broadcasting/auth';
+    final hostApi = ApiService.baseUrl;
+    final host = hostApi.replaceFirst(RegExp(r"/api$"), "");
+    final authEndpoint = "$host/broadcasting/auth";
 
-    final key = pusherKey ?? const String.fromEnvironment('PUSHER_KEY', defaultValue: 'YOUR_PUSHER_KEY');
-    final pusherCluster = cluster ?? const String.fromEnvironment('PUSHER_CLUSTER', defaultValue: 'mt1');
+    final key = pusherKey ??
+        const String.fromEnvironment(
+          "PUSHER_KEY",
+          defaultValue: "YOUR_PUSHER_KEY",
+        );
 
-    try {
-      final options = PusherOptions(
-        cluster: pusherCluster,
-        encrypted: true,
-        auth: PusherAuth(authEndpoint, headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        }),
-      );
+    final pusherCluster = cluster ??
+        const String.fromEnvironment(
+          "PUSHER_CLUSTER",
+          defaultValue: "ap1",
+        );
 
-      print("PUSHER KEY = $key");
-      print("PUSHER CLUSTER = $pusherCluster");
+    print("PUSHER KEY = $key");
+    print("PUSHER CLUSTER = $pusherCluster");
+    print("AUTH ENDPOINT = $authEndpoint");
 
-      _pusher = PusherClient(key, options, autoConnect: true);
+    await _pusher.init(
+      apiKey: key,
+      cluster: pusherCluster,
+      useTLS: true,
+      authEndpoint: authEndpoint,
+      authTransport: "ajax",
+      authParams: {
+        "headers": {
+          "Authorization": "Bearer $token",
+          "Accept": "application/json",
+        }
+      },
 
-      _pusher?.onConnectionStateChange((state) {
-        print("PUSHER STATE = ${state?.currentState}");
-      });
+      onConnectionStateChange: (current, previous) {
+        print("PUSHER STATE = $current");
+      },
 
-      _pusher?.onConnectionError((error) {
-        print("PUSHER ERROR = ${error?.message}");
-      });
+      onError: (message, code, error) {
+        print("PUSHER ERROR = $message");
+        print(error);
+      },
 
-      _pusher?.connect();
+      onSubscriptionSucceeded: (channel, data) {
+        print("SUBSCRIBED = $channel");
+      },
 
-      _channelName = 'private-App.Models.User.$userId';
-      _channel = _pusher?.subscribe(_channelName!);
-      print("SUBSCRIBE CHANNEL = $_channelName");
+      onSubscriptionError: (message, error) {
+        print("SUBSCRIBE ERROR = $message");
+        print(error);
+      },
 
-      // Listen for Laravel broadcast notification event
-      _channel?.bind(
-        'Illuminate\\Notifications\\Events\\BroadcastNotificationCreated',
-        (event) {
-          print("NOTIFICATION EVENT = ${event?.data}");
+      onEvent: (event) {
+        print("EVENT = ${event.eventName}");
+        print(event.data);
 
-          if (event?.data == null) return;
+        if (event.eventName !=
+            "Illuminate\\Notifications\\Events\\BroadcastNotificationCreated") {
+          return;
+        }
 
-          try {
-            final payload = json.decode(event!.data!);
+        try {
+          dynamic payload = event.data;
 
-            print("PAYLOAD = $payload");
-
-            final data = payload['data'] ?? payload;
-
-            _controller.add(
-              Map<String, dynamic>.from(data),
-            );
-          } catch (e) {
-            print("PARSE ERROR = $e");
+          if (payload is String) {
+            payload = json.decode(payload);
           }
-        },
-      );
-    } catch (e) { // <-- PERBAIKAN: Menutup blok try utama di fungsi init
-      print("PUSHER INIT ERROR = $e");
-    }
+
+          final data = payload["data"] ?? payload;
+
+          _controller.add(
+            Map<String, dynamic>.from(data),
+          );
+        } catch (e) {
+          print("PARSE ERROR = $e");
+        }
+      },
+    );
+
+    await _pusher.connect();
+
+    final channel = "private-App.Models.User.$userId";
+
+    print("SUBSCRIBE CHANNEL = $channel");
+
+    await _pusher.subscribe(
+      channelName: channel,
+    );
+
+    _initialized = true;
   }
 
-  void dispose() {
-    try {
-      // unbind specific event and unsubscribe from channel
-      _channel?.unbind('Illuminate\\Notifications\\Events\\BroadcastNotificationCreated');
-      if (_channelName != null) {
-        _pusher?.unsubscribe(_channelName!);
-      }
-      if (_pusher != null) {
-        _pusher?.disconnect();
-        _pusher = null;
-      }
-      _controller.close();
-    } catch (_) {}
+  Future<void> dispose() async {
+    await _pusher.disconnect();
   }
 }

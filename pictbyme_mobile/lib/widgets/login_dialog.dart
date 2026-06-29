@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
@@ -17,7 +18,7 @@ class _LoginDialogState extends State<LoginDialog> {
   final TextEditingController passwordController = TextEditingController();
   final ApiService apiService = ApiService();
   final _formKey = GlobalKey<FormState>();
-  
+
   bool isLoading = false;
 
   @override
@@ -41,7 +42,8 @@ class _LoginDialogState extends State<LoginDialog> {
   }
 
   Future<void> login() async {
-    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) {
       return;
     }
 
@@ -50,31 +52,48 @@ class _LoginDialogState extends State<LoginDialog> {
     });
 
     try {
-      final response = await apiService.login(
+      final Response? response = await apiService.login(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
       if (!mounted) return;
 
-      if (response.data['success'] == true) {
+      if (response == null) {
+        _showSnackBar('Tidak ada respon dari server.');
+        return;
+      }
 
-  print("LOGIN RESPONSE = ${response.data}");
+      // Simpan dulu ke variabel lokal lalu cek null, supaya tidak ada
+      // unconditional access ke response.data yang bertipe nullable (dynamic? dari Dio).
+      final data = response.data;
 
-  final prefs = await SharedPreferences.getInstance();
+      if (data == null) {
+        _showSnackBar('Respon server tidak valid.');
+        return;
+      }
 
-  await prefs.setString(
-    'token',
-    response.data['token'],
-  );
+      final bool success = data['success'] == true;
 
-  print(
-    "TOKEN SAVED = ${response.data['token']}"
-  );
+      if (success) {
+        final token = data['token'];
 
-  print(
-    "TOKEN READ BACK = ${prefs.getString('token')}"
-  );
+        if (kDebugMode) {
+          debugPrint("LOGIN RESPONSE = $data");
+        }
+
+        if (token == null) {
+          _showSnackBar('Token tidak ditemukan pada respon server.');
+          return;
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', token.toString());
+
+        if (kDebugMode) {
+          debugPrint("TOKEN SAVED = $token");
+          debugPrint("TOKEN READ BACK = ${prefs.getString('token')}");
+        }
 
         if (!mounted) return;
 
@@ -83,32 +102,43 @@ class _LoginDialogState extends State<LoginDialog> {
         // Tutup dialog login secara aman
         Navigator.pop(context);
 
+        if (!mounted) return;
+
         // Alihkan halaman utama
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else {
-        final msg = response.data['message'] ?? 'Login gagal. Periksa kembali akun Anda.';
+        final msg = data['message'] ?? 'Login gagal. Periksa kembali akun Anda.';
         _showSnackBar(msg.toString());
       }
     } on DioException catch (e) {
+      if (kDebugMode) {
+        debugPrint("========== LOGIN ERROR ==========");
+        debugPrint("Message : ${e.message}");
+        debugPrint("Type    : ${e.type}");
+        debugPrint("Status  : ${e.response?.statusCode}");
+        debugPrint("Data    : ${e.response?.data}");
+        debugPrint("Request : ${e.requestOptions.uri}");
+        debugPrint("Error   : ${e.error}");
+      }
+
       if (!mounted) return;
-      String message = 'Terjadi kesalahan. Silakan coba lagi.';
+
+      String message = 'Terjadi kesalahan.';
 
       if (e.response?.statusCode == 401) {
-        message = 'Email atau password salah.';
-      } else if (e.response?.statusCode == 422) {
-        message = 'Data login tidak valid.';
-      } else if (e.response?.statusCode == 404) {
-        message = 'Akun belum terdaftar.';
+        message = 'Email atau password salah';
       }
 
       _showSnackBar(message);
-      debugPrint('LOGIN ERROR: ${e.response?.data}');
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar('Tidak dapat terhubung ke server.');
-      debugPrint('ERROR: $e');
+      if (kDebugMode) {
+        debugPrint('ERROR: $e');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -122,7 +152,7 @@ class _LoginDialogState extends State<LoginDialog> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     // Tentukan apakah layar cukup lebar untuk menampilkan layout bersebelahan
-    final isDesktop = size.width > 768; 
+    final isDesktop = size.width > 768;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -137,7 +167,7 @@ class _LoginDialogState extends State<LoginDialog> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               blurRadius: 30,
               offset: const Offset(0, 10),
             ),
@@ -177,7 +207,7 @@ class _LoginDialogState extends State<LoginDialog> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.camera_alt_rounded, size: 40, color: Colors.black87),
@@ -310,7 +340,7 @@ class _LoginDialogState extends State<LoginDialog> {
             ),
           ),
         ),
-        
+
         // Tombol Close (X) di kanan atas form
         Positioned(
           top: 16,
@@ -344,7 +374,7 @@ class _LoginDialogState extends State<LoginDialog> {
               Icon(
                 Icons.photo_library_rounded,
                 size: 110,
-                color: Colors.white.withOpacity(0.95),
+                color: Colors.white.withValues(alpha: 0.95),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -356,7 +386,7 @@ class _LoginDialogState extends State<LoginDialog> {
                 'Bagikan Ceritamu\nMelalui Lembaran Foto',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.75),
+                  color: Colors.white.withValues(alpha: 0.75),
                   fontSize: 16,
                   height: 1.5,
                   fontWeight: FontWeight.w500,
