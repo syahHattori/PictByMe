@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/login_dialog.dart';
@@ -11,8 +12,9 @@ class LandingScreen extends StatelessWidget {
 
   static const Color primaryBlue = Color(0xFF0077B6);
 
-  // URL APK yang sudah diupload di server (lihat public/download/app-release.apk).
-  static const String _apkUrl = 'https://api.pictbyme.web.id/download/app-release.apk';
+  // URL APK yang sudah diupload di server (lihat public/download/PictByMe-App.apk).
+  static const String _apkUrl =
+      'https://api.pictbyme.web.id/download/PictByMe-App.apk';
 
   Future<void> _downloadApk() async {
     final uri = Uri.parse(_apkUrl);
@@ -289,25 +291,29 @@ class LandingScreen extends StatelessWidget {
                               child: const Text('Learn More'),
                             ),
                             // TOMBOL DOWNLOAD ANDROID
+                            // Hanya tampil di Flutter Web (kIsWeb). Di Android/iOS/desktop
+                            // tombol ini disembunyikan total, karena aplikasi sudah
+                            // berjalan native di platform tersebut.
                             // Wrap akan otomatis menurunkan tombol ini ke baris baru di layar
-                            // sempit (mobile), tepat di bawah Get Started & Learn More.
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryBlue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 28,
-                                  vertical: 14,
+                            // sempit (mobile web), tepat di bawah Get Started & Learn More.
+                            if (kIsWeb)
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryBlue,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 28,
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 0,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
+                                onPressed: _downloadApk,
+                                icon: const Icon(Icons.android),
+                                label: const Text('Download Android'),
                               ),
-                              onPressed: _downloadApk,
-                              icon: const Icon(Icons.android),
-                              label: const Text('Download Android'),
-                            ),
                           ],
                         ),
                       ],
