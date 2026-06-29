@@ -101978,18 +101978,20 @@ A.rK.prototype={
 Aa(){var s=0,r=A.t(t.H)
 var $async$Aa=A.u(function(a,b){if(a===1)return A.p(b,r)
 for(;;)switch(s){case 0:s=2
-return A.k(A.aPb(A.j8("https://api.pictbyme.web.id/download/app-release.apk",0,null),B.Rz),$async$Aa)
+return A.k(A.aPb(A.j8("https://api.pictbyme.web.id/download/PictByMe-App.apk",0,null),B.Rz),$async$Aa)
 case 2:return A.q(null,r)}})
 return A.r($async$Aa,r)},
-J(a){var s,r,q,p=null,o=A.by(a,p,t.w).w.a.a,n=o<800,m=n?20:70,l=n?A.aRK(A.R_(A.b([A.aRL(A.bG(B.Ty,B.q,B.m,B.o,0),B.GJ),A.fc(!1,p,p,p,!0,p,p,p,!0,p,B.QG,p,p,p,p,new A.afn(a),!1,p,p,p,p,p,B.ES,p,p),A.fc(!1,p,p,p,!0,p,p,p,!0,p,B.QB,p,p,p,p,new A.afo(a),!1,p,p,p,p,p,B.EP,p,p),A.fc(!1,p,p,p,!0,p,p,p,!0,p,B.Q6,p,p,p,p,new A.afp(a),!1,p,p,p,p,p,B.EO,p,p),B.lW,new A.aS(B.eY,A.Ef(B.oE,new A.afq(a),A.Eh(p,p,p,p,p,p,p,p,p,p,p,B.DY,p,p,p,p,p,p,p,p)),p),new A.aS(B.eY,A.eC(B.oF,new A.afr(a),A.dK(p,p,B.b3,p,p,p,0,p,p,B.f,p,B.DY,p,p,p,p,p,p,p,p)),p)],t.p),B.aj,p,p,!1)):p,k=n?40:80,j=n?B.q:B.R,i=n?B.a1:B.ae
-i=A.Z("Discover Beautiful Photography oke ",p,p,p,A.aY(p,p,p,p,p,p,p,p,p,p,p,n?34:52,p,p,B.y,p,p,!0,p,p,p,p,p,p,p,p),i,p)
-s=A.Z("Share, save and inspire with millions of creators around the world.",p,p,p,B.a4R,n?B.a1:B.ae,p)
-r=n?B.c_:B.dK
+J(a){var s,r,q,p,o=null,n=A.by(a,o,t.w).w.a.a,m=n<800,l=m?20:70,k=m?A.aRK(A.R_(A.b([A.aRL(A.bG(B.Ty,B.q,B.m,B.o,0),B.GJ),A.fc(!1,o,o,o,!0,o,o,o,!0,o,B.QG,o,o,o,o,new A.afn(a),!1,o,o,o,o,o,B.ES,o,o),A.fc(!1,o,o,o,!0,o,o,o,!0,o,B.QB,o,o,o,o,new A.afo(a),!1,o,o,o,o,o,B.EP,o,o),A.fc(!1,o,o,o,!0,o,o,o,!0,o,B.Q6,o,o,o,o,new A.afp(a),!1,o,o,o,o,o,B.EO,o,o),B.lW,new A.aS(B.eY,A.Ef(B.oE,new A.afq(a),A.Eh(o,o,o,o,o,o,o,o,o,o,o,B.DY,o,o,o,o,o,o,o,o)),o),new A.aS(B.eY,A.eC(B.oF,new A.afr(a),A.dK(o,o,B.b3,o,o,o,0,o,o,B.f,o,B.DY,o,o,o,o,o,o,o,o)),o)],t.p),B.aj,o,o,!1)):o,j=m?40:80,i=m?B.q:B.R,h=m?B.a1:B.ae
+h=A.Z("Discover Beautiful Photography oke ",o,o,o,A.aY(o,o,o,o,o,o,o,o,o,o,o,m?34:52,o,o,B.y,o,o,!0,o,o,o,o,o,o,o,o),h,o)
+s=A.Z("Share, save and inspire with millions of creators around the world.",o,o,o,B.a4R,m?B.a1:B.ae,o)
+r=m?B.c_:B.dK
 q=t.p
-j=A.af(p,A.aT(A.b([i,B.cb,s,B.kc,A.io(r,A.b([A.wi(B.tk,B.ER,new A.afs(a),A.dK(p,p,B.b3,p,p,p,p,p,p,B.f,p,p,B.rb,p,p,p,p,p,p,p)),A.Ef(B.a8v,new A.aft(a),A.Eh(p,p,p,p,p,p,p,p,p,p,p,p,B.rb,p,p,p,p,p,p,p)),A.wi(B.Qp,B.a8A,this.gaeA(),A.dK(p,p,B.b3,p,p,p,0,p,p,B.f,p,p,B.NM,p,new A.aP(A.V(12),B.n),p,p,p,p,p))],q),B.bP,12,15)],q),j,B.m,B.o),B.i,p,B.Gr,p,p,p,p,p,p,p,1/0)
-i=n?o-m*2:520
-k=A.af(p,A.io(B.c_,A.b([j,A.af(p,A.f4(A.V(24),A.h3("https://picsum.photos/700/500",p,B.aX,p,p,p),B.ac),B.i,p,B.Gp,p,p,p,p,p,p,p,i)],q),B.Fb,40,60),B.i,p,p,p,p,p,p,new A.a_(m,k,m,k),p,p,1/0)
-return A.eX(p,B.f,A.ft(A.aT(A.b([new A.dI(new A.afu(m,n,a),p),k,A.af(p,A.aT(A.b([A.Z("Why Choose PictByMe?",p,p,p,A.aY(p,p,p,p,p,p,p,p,p,p,p,n?28:36,p,p,B.y,p,p,!0,p,p,p,p,p,p,p,p),B.a1,p),B.ke,A.io(B.c_,A.b([A.aN4(B.Om,"Photography","Upload and share your best work."),A.aN4(B.rQ,"Collections","Save your favorite photos."),A.aN4(B.mN,"Community","Connect with creators worldwide.")],q),B.bP,25,25)],q),B.q,B.m,B.o),B.i,B.L2,p,p,p,p,p,new A.a_(m,70,m,70),p,p,1/0)],q),B.q,B.m,B.o),p,p,p),l,!1)}}
+p=A.b([A.wi(B.tk,B.ER,new A.afs(a),A.dK(o,o,B.b3,o,o,o,o,o,o,B.f,o,o,B.rb,o,o,o,o,o,o,o)),A.Ef(B.a8v,new A.aft(a),A.Eh(o,o,o,o,o,o,o,o,o,o,o,o,B.rb,o,o,o,o,o,o,o))],q)
+p.push(A.wi(B.Qp,B.a8A,this.gaeA(),A.dK(o,o,B.b3,o,o,o,0,o,o,B.f,o,o,B.NM,o,new A.aP(A.V(12),B.n),o,o,o,o,o)))
+i=A.af(o,A.aT(A.b([h,B.cb,s,B.kc,A.io(r,p,B.bP,12,15)],q),i,B.m,B.o),B.i,o,B.Gr,o,o,o,o,o,o,o,1/0)
+h=m?n-l*2:520
+j=A.af(o,A.io(B.c_,A.b([i,A.af(o,A.f4(A.V(24),A.h3("https://picsum.photos/700/500",o,B.aX,o,o,o),B.ac),B.i,o,B.Gp,o,o,o,o,o,o,o,h)],q),B.Fb,40,60),B.i,o,o,o,o,o,o,new A.a_(l,j,l,j),o,o,1/0)
+return A.eX(o,B.f,A.ft(A.aT(A.b([new A.dI(new A.afu(l,m,a),o),j,A.af(o,A.aT(A.b([A.Z("Why Choose PictByMe?",o,o,o,A.aY(o,o,o,o,o,o,o,o,o,o,o,m?28:36,o,o,B.y,o,o,!0,o,o,o,o,o,o,o,o),B.a1,o),B.ke,A.io(B.c_,A.b([A.aN4(B.Om,"Photography","Upload and share your best work."),A.aN4(B.rQ,"Collections","Save your favorite photos."),A.aN4(B.mN,"Community","Connect with creators worldwide.")],q),B.bP,25,25)],q),B.q,B.m,B.o),B.i,B.L2,o,o,o,o,o,new A.a_(l,70,l,70),o,o,1/0)],q),B.q,B.m,B.o),o,o,o),k,!1)}}
 A.afn.prototype={
 $0(){var s,r=this.a
 A.ay(r,!1).bl(null)
